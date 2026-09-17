@@ -1,252 +1,803 @@
-const mediaInput = document.getElementById("mediaInput");
-const languageSelect = document.getElementById("languageSelect");
-const textInput = document.getElementById("textInput");
+"use strict";
 
-const previewImage = document.getElementById("previewImage");
-const previewVideo = document.getElementById("previewVideo");
-const previewStage = document.getElementById("previewStage");
-const textOverlay = document.getElementById("textOverlay");
-const emptyPreview = document.getElementById("emptyPreview");
+/*
+ * Anjali Awasthi Reel Studio
+ *
+ * Responsibilities:
+ * - Image/video preview
+ * - Text validation and character count
+ * - Local browser TTS preview
+ * - One visible text line at a time
+ * - Multicolor text rendering
+ * - Preview play button handling
+ * - Safe cleanup of object URLs
+ *
+ * Important limitation:
+ * Browser speechSynthesis can play speech locally, but it does not
+ * normally expose the generated speech as an audio file or audio stream.
+ * Therefore, this file does not pretend to create a final audio-video
+ * export from speechSynthesis alone.
+ */
 
-const speakButton = document.getElementById("speakButton");
-const exportButton = document.getElementById("exportButton");
+const MAX_TEXT_LENGTH = 10000;
+const PREVIEW_LINE_LIMIT = 72;
+const TTS_RATE = 0.92;
+const TTS_PITCH = 1;
+const TTS_VOLUME = 1;
 
-const ttsAudio = document.getElementById("ttsAudio");
-const downloadLink = document.getElementById("downloadLink");
+const mediaInput = document.querySelector("#mediaInput");
+const languageSelect = document.querySelector("#languageSelect");
+const textInput = document.querySelector("#textInput");
+const charCount = document.querySelector("#charCount");
+const speakButton = document.querySelector("#speakButton");
+const exportButton = document.querySelector("#exportButton");
+const downloadLink = document.querySelector("#downloadLink");
+const message = document.querySelector("#message");
+const appStatus = document.querySelector("#appStatus");
 
-const charCount = document.getElementById("charCount");
-const appStatus = document.getElementById("appStatus");
-const message = document.getElementById("message");
+const previewImage = document.querySelector("#previewImage");
+const previewVideo = document.querySelector("#previewVideo");
+const emptyPreview = document.querySelector("#emptyPreview");
+const textOverlay = document.querySelector("#textOverlay");
+const watermark = document.querySelector("#watermark");
+const previewPlayButton = document.querySelector("#previewPlayButton");
+const previewPlayIcon = document.querySelector("#previewPlayIcon");
+const previewState = document.querySelector("#previewState");
+const ttsAudio = document.querySelector("#ttsAudio");
 
-let mediaUrl = "";
+let mediaObjectUrl = null;
+let exportedObjectUrl = null;
 
-function setMessage(text = "", type = "") {
+let selectedMediaType = null;
+let selectedFile = null;
+
+let previewLines = [];
+let currentLineIndex = 0;
+let currentUtterance = null;
+let previewRunId = 0;
+let isPreviewRunning = false;
+
+let availableVoices = [];
+
+function getElement(selector) {
+  return document.querySelector(selector);
+}
+
+function setMessage(text, type = "info") {
+  if (!message) {
+    return;
+  }
+
   message.textContent = text;
   message.dataset.type = type;
 }
 
-function setStatus(text) {
+function setAppStatus(text, type = "info") {
+  if (!appStatus) {
+    return;
+  }
+
   appStatus.textContent = text;
+  appStatus.dataset.type = type;
 }
 
-function updateText() {
-  const text = textInput.value.trim();
+function setPreviewState(text) {
+  if (!previewState) {
+    return;
+  }
 
-  textOverlay.textContent = text;
-  charCount.textContent = `${textInput.value.length} / ${textInput.maxLength}`;
+  previewState.textContent = text;
+}
 
-  if (!text) {
-    textOverlay.hidden = true;
+function updateCharacterCount() {
+  if (!textInput || !charCount) {
+    return;
+  }
+
+  const length = textInput.value.length;
+  charCount.textContent = `${length.toLocaleString("en-IN")} / ${MAX_TEXT_LENGTH.toLocaleString("en-IN")}`;
+
+  if (length > MAX_TEXT_LENGTH) {
+    charCount.dataset.state = "error";
   } else {
-    textOverlay.hidden = false;
-  }
-
-  updateControls();
-}
-
-function updateControls() {
-  const hasMedia =
-    !previewImage.hidden || !previewVideo.hidden;
-
-  const hasText = textInput.value.trim().length > 0;
-
-  speakButton.disabled = !hasText;
-  exportButton.disabled = true;
-
-  if (!hasMedia) {
-    setStatus("मीडिया चुनें");
-  } else if (!hasText) {
-    setStatus("टेक्स्ट लिखें");
-  } else {
-    setStatus("तैयार");
+    charCount.dataset.state = "normal";
   }
 }
 
-function clearMediaUrl() {
-  if (mediaUrl) {
-    URL.revokeObjectURL(mediaUrl);
-    mediaUrl = "";
+function getText() {
+  return textInput ? textInput.value : "";
+}
+
+function getLanguage() {
+  return languageSelect && languageSelect.value
+    ? languageSelect.value
+    : "hi-IN";
+}
+
+function validateText() {
+  const text = getText();
+
+  if (!text.trim()) {
+    return {
+      valid: false,
+      message: "कृपया पहले सुविचार लिखें।",
+    };
+  }
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    return {
+      valid: false,
+      message: `सुविचार अधिकतम ${MAX_TEXT_LENGTH.toLocaleString("en-IN")} वर्णों का हो सकता है।`,
+    };
+  }
+
+  return {
+    valid: true,
+    message: "",
+  };
+}
+
+function validateMedia() {
+  if (!selectedFile || !selectedMediaType) {
+    return {
+      valid: false,
+      message: "कृपया पहले कोई फोटो या वीडियो चुनें।",
+    };
+  }
+
+  return {
+    valid: true,
+    message: "",
+  };
+}
+
+function validatePreviewInputs() {
+  const textResult = validateText();
+
+  if (!textResult.valid) {
+    return textResult;
+  }
+
+  const mediaResult = validateMedia();
+
+  if (!mediaResult.valid) {
+    return mediaResult;
+  }
+
+  return {
+    valid: true,
+    message: "",
+  };
+}
+
+function revokeMediaObjectUrl() {
+  if (mediaObjectUrl) {
+    URL.revokeObjectURL(mediaObjectUrl);
+    mediaObjectUrl = null;
   }
 }
 
-function resetPreview() {
-  previewImage.hidden = true;
-  previewVideo.hidden = true;
-  previewImage.removeAttribute("src");
-  previewVideo.removeAttribute("src");
-
-  emptyPreview.hidden = false;
-  clearMediaUrl();
+function revokeExportedObjectUrl() {
+  if (exportedObjectUrl) {
+    URL.revokeObjectURL(exportedObjectUrl);
+    exportedObjectUrl = null;
+  }
 }
 
-function showImage(file) {
-  clearMediaUrl();
+function resetMediaPreview() {
+  if (previewImage) {
+    previewImage.hidden = true;
+    previewImage.removeAttribute("src");
+  }
 
-  mediaUrl = URL.createObjectURL(file);
-  previewImage.src = mediaUrl;
-  previewImage.hidden = false;
-  previewVideo.hidden = true;
-  emptyPreview.hidden = true;
+  if (previewVideo) {
+    previewVideo.pause();
+    previewVideo.hidden = true;
+    previewVideo.removeAttribute("src");
+    previewVideo.load();
+  }
 
-  setStatus("फोटो तैयार");
-  setMessage("");
+  if (emptyPreview) {
+    emptyPreview.hidden = false;
+  }
+
+  selectedMediaType = null;
+  selectedFile = null;
 }
 
-function showVideo(file) {
-  clearMediaUrl();
-
-  mediaUrl = URL.createObjectURL(file);
-  previewVideo.src = mediaUrl;
-  previewVideo.hidden = false;
-  previewImage.hidden = true;
-  emptyPreview.hidden = true;
-
-  previewVideo.currentTime = 0;
-  previewVideo.load();
-
-  setStatus("वीडियो तैयार");
-  setMessage("");
-}
-
-function handleMediaChange() {
-  const file = mediaInput.files?.[0];
-
+function loadSelectedMedia(file) {
   if (!file) {
-    resetPreview();
-    updateControls();
     return;
   }
 
   if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-    mediaInput.value = "";
-    resetPreview();
-    setStatus("मीडिया चुनें");
+    resetMediaPreview();
     setMessage("केवल फोटो या वीडियो फाइल चुनें।", "error");
-    updateControls();
     return;
+  }
+
+  stopPreview();
+
+  revokeMediaObjectUrl();
+
+  selectedFile = file;
+  mediaObjectUrl = URL.createObjectURL(file);
+
+  if (emptyPreview) {
+    emptyPreview.hidden = true;
   }
 
   if (file.type.startsWith("image/")) {
-    showImage(file);
+    selectedMediaType = "image";
+
+    if (previewVideo) {
+      previewVideo.pause();
+      previewVideo.hidden = true;
+      previewVideo.removeAttribute("src");
+      previewVideo.load();
+    }
+
+    if (previewImage) {
+      previewImage.src = mediaObjectUrl;
+      previewImage.alt = file.name || "चुनी गई फोटो";
+      previewImage.hidden = false;
+    }
+
+    setPreviewState("फोटो तैयार है। Preview सुनने के लिए Play दबाएँ।");
+    setMessage("फोटो सफलतापूर्वक लोड हो गई है।", "success");
   } else {
-    showVideo(file);
+    selectedMediaType = "video";
+
+    if (previewImage) {
+      previewImage.hidden = true;
+      previewImage.removeAttribute("src");
+    }
+
+    if (previewVideo) {
+      previewVideo.src = mediaObjectUrl;
+      previewVideo.hidden = false;
+      previewVideo.muted = true;
+      previewVideo.playsInline = true;
+      previewVideo.load();
+    }
+
+    setPreviewState("वीडियो तैयार है। Preview सुनने के लिए Play दबाएँ।");
+    setMessage("वीडियो सफलतापूर्वक लोड हो गया है।", "success");
   }
 
-  updateControls();
+  updateExportAvailability();
 }
 
-function getSpeechLanguage() {
-  return languageSelect.value === "sa-IN"
-    ? "sa-IN"
-    : "hi-IN";
+function normalizeText(text) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
 }
 
-function findVoice(language) {
-  if (!("speechSynthesis" in window)) {
+function splitLongTextIntoLines(text) {
+  const normalized = normalizeText(text);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const sourceParagraphs = normalized
+    .split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  const lines = [];
+
+  for (const paragraph of sourceParagraphs) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let currentLine = "";
+
+    for (const word of words) {
+      const proposedLine = currentLine
+        ? `${currentLine} ${word}`
+        : word;
+
+      if (
+        currentLine &&
+        proposedLine.length > PREVIEW_LINE_LIMIT
+      ) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = proposedLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+  }
+
+  return lines;
+}
+
+function createMulticolorLine(line) {
+  const safeText = String(line)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  return safeText;
+}
+
+function showLine(line, index) {
+  if (!textOverlay) {
+    return;
+  }
+
+  if (!line) {
+    textOverlay.textContent = "";
+    textOverlay.hidden = true;
+    return;
+  }
+
+  textOverlay.innerHTML = createMulticolorLine(line);
+  textOverlay.hidden = false;
+  textOverlay.dataset.lineIndex = String(index);
+}
+
+function preparePreviewLines() {
+  previewLines = splitLongTextIntoLines(getText());
+  currentLineIndex = 0;
+
+  if (previewLines.length > 0) {
+    showLine(previewLines[0], 0);
+  } else {
+    showLine("", 0);
+  }
+}
+
+function getVoiceForLanguage(language) {
+  if (!availableVoices.length) {
     return null;
   }
 
-  const voices = window.speechSynthesis.getVoices();
-
-  const exact = voices.find(
-    voice => voice.lang.toLowerCase() === language.toLowerCase()
+  const exactVoice = availableVoices.find(
+    (voice) => voice.lang.toLowerCase() === language.toLowerCase()
   );
 
-  if (exact) {
-    return exact;
+  if (exactVoice) {
+    return exactVoice;
   }
 
-  const base = language.slice(0, 2).toLowerCase();
+  const languagePrefix = language.split("-")[0].toLowerCase();
 
-  return voices.find(
-    voice => voice.lang.toLowerCase().startsWith(base)
-  ) || null;
+  return (
+    availableVoices.find((voice) =>
+      voice.lang.toLowerCase().startsWith(languagePrefix)
+    ) || null
+  );
 }
 
-function speakText() {
-  const text = textInput.value.trim();
+function loadVoices() {
+  if (!("speechSynthesis" in window)) {
+    availableVoices = [];
+    return;
+  }
 
-  if (!text) {
-    setMessage("पहले टेक्स्ट लिखें।", "error");
-    textInput.focus();
+  availableVoices = window.speechSynthesis.getVoices();
+}
+
+function stopSpeechSynthesis() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  currentUtterance = null;
+}
+
+function setPreviewButtonRunning(running) {
+  isPreviewRunning = running;
+
+  if (previewPlayButton) {
+    previewPlayButton.hidden = running;
+    previewPlayButton.disabled = running;
+  }
+
+  if (speakButton) {
+    speakButton.disabled = running;
+  }
+
+  if (running) {
+    setAppStatus("Preview चल रहा है…", "active");
+  } else {
+    setAppStatus("तैयार", "ready");
+  }
+}
+
+function finishPreview(runId) {
+  if (runId !== previewRunId) {
+    return;
+  }
+
+  stopSpeechSynthesis();
+
+  if (selectedMediaType === "video" && previewVideo) {
+    previewVideo.pause();
+    previewVideo.currentTime = 0;
+  }
+
+  currentLineIndex = 0;
+  setPreviewButtonRunning(false);
+  setPreviewState("Preview समाप्त हो गया। फिर से चलाने के लिए Play दबाएँ।");
+
+  if (previewLines.length > 0) {
+    showLine(previewLines[0], 0);
+  } else {
+    showLine("", 0);
+  }
+}
+
+function speakLineAtIndex(index, runId) {
+  if (runId !== previewRunId) {
+    return;
+  }
+
+  if (index >= previewLines.length) {
+    finishPreview(runId);
+    return;
+  }
+
+  const line = previewLines[index];
+
+  currentLineIndex = index;
+  showLine(line, index);
+
+  if (!("speechSynthesis" in window)) {
+    finishPreview(runId);
+    setMessage(
+      "इस ब्राउज़र में स्थानीय आवाज़ सुनाने की सुविधा उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(line);
+  const language = getLanguage();
+  const selectedVoice = getVoiceForLanguage(language);
+
+  utterance.lang = language;
+  utterance.rate = TTS_RATE;
+  utterance.pitch = TTS_PITCH;
+  utterance.volume = TTS_VOLUME;
+
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+  }
+
+  utterance.onstart = () => {
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    setPreviewState(
+      `पंक्ति ${index + 1} / ${previewLines.length} चल रही है`
+    );
+  };
+
+  utterance.onend = () => {
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    speakLineAtIndex(index + 1, runId);
+  };
+
+  utterance.onerror = (event) => {
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    if (event.error === "canceled" || event.error === "interrupted") {
+      return;
+    }
+
+    finishPreview(runId);
+    setMessage(
+      "आवाज़ चलाते समय ब्राउज़र ने त्रुटि दी। कृपया फिर प्रयास करें।",
+      "error"
+    );
+  };
+
+  currentUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+}
+
+function startVideoPreview() {
+  if (selectedMediaType !== "video" || !previewVideo) {
+    return;
+  }
+
+  previewVideo.currentTime = 0;
+  previewVideo.muted = true;
+
+  const playResult = previewVideo.play();
+
+  if (playResult && typeof playResult.catch === "function") {
+    playResult.catch(() => {
+      setMessage(
+        "वीडियो स्वतः नहीं चल पाया। ब्राउज़र की अनुमति जाँचें।",
+        "error"
+      );
+    });
+  }
+}
+
+function startPreview() {
+  const validation = validatePreviewInputs();
+
+  if (!validation.valid) {
+    setMessage(validation.message, "error");
     return;
   }
 
   if (!("speechSynthesis" in window)) {
     setMessage(
-      "इस browser में स्थानीय speech synthesis उपलब्ध नहीं है।",
+      "इस ब्राउज़र में speechSynthesis उपलब्ध नहीं है।",
       "error"
     );
     return;
   }
 
-  window.speechSynthesis.cancel();
+  stopPreview();
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = getSpeechLanguage();
+  preparePreviewLines();
 
-  const voice = findVoice(utterance.lang);
-
-  if (voice) {
-    utterance.voice = voice;
+  if (!previewLines.length) {
+    setMessage("Preview के लिए कोई टेक्स्ट उपलब्ध नहीं है।", "error");
+    return;
   }
 
-  // Natural baseline; device voice engine determines the final timbre.
-  utterance.rate = 0.92;
-  utterance.pitch = 1;
-  utterance.volume = 1;
+  previewRunId += 1;
+  const runId = previewRunId;
+
+  setPreviewButtonRunning(true);
+  setPreviewState("Preview शुरू हो रहा है…");
+  setMessage(
+    "Preview में दृश्य, टेक्स्ट और स्थानीय आवाज़ साथ चलेंगे।",
+    "info"
+  );
+
+  startVideoPreview();
+  speakLineAtIndex(0, runId);
+}
+
+function stopPreview() {
+  previewRunId += 1;
+  stopSpeechSynthesis();
+
+  if (previewVideo) {
+    previewVideo.pause();
+  }
+
+  setPreviewButtonRunning(false);
+
+  if (previewLines.length > 0) {
+    showLine(previewLines[0], 0);
+  }
+}
+
+function speakTextOnly() {
+  const textResult = validateText();
+
+  if (!textResult.valid) {
+    setMessage(textResult.message, "error");
+    return;
+  }
+
+  if (!("speechSynthesis" in window)) {
+    setMessage(
+      "इस ब्राउज़र में स्थानीय आवाज़ सुनाने की सुविधा उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
+
+  if (isPreviewRunning) {
+    stopPreview();
+    setMessage("आवाज़ सुनना रोक दिया गया है।", "info");
+    return;
+  }
+
+  stopSpeechSynthesis();
+
+  const utterance = new SpeechSynthesisUtterance(normalizeText(getText()));
+  const language = getLanguage();
+  const selectedVoice = getVoiceForLanguage(language);
+
+  utterance.lang = language;
+  utterance.rate = TTS_RATE;
+  utterance.pitch = TTS_PITCH;
+  utterance.volume = TTS_VOLUME;
+
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+  }
 
   utterance.onstart = () => {
-    setStatus("आवाज़ चल रही है");
-    setMessage("TTS playback शुरू हो गया।");
-    speakButton.disabled = true;
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ रोकें";
+    }
+
+    setAppStatus("आवाज़ चल रही है…", "active");
+    setMessage("टेक्स्ट की स्थानीय आवाज़ चल रही है।", "info");
   };
 
   utterance.onend = () => {
-    updateControls();
-    setMessage("TTS playback पूरा हुआ।", "success");
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ सुनें";
+    }
+
+    setAppStatus("तैयार", "ready");
+    setMessage("आवाज़ सुनना पूरा हो गया।", "success");
+    currentUtterance = null;
   };
 
-  utterance.onerror = event => {
-    updateControls();
+  utterance.onerror = (event) => {
+    if (event.error === "canceled" || event.error === "interrupted") {
+      return;
+    }
+
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ सुनें";
+    }
+
+    setAppStatus("तैयार", "ready");
     setMessage(
-      `TTS playback शुरू नहीं हो सका: ${event.error || "अज्ञात त्रुटि"}`,
+      "आवाज़ चलाते समय त्रुटि हुई। कृपया फिर प्रयास करें।",
       "error"
     );
+    currentUtterance = null;
   };
 
+  currentUtterance = utterance;
   window.speechSynthesis.speak(utterance);
 }
 
-function stopSpeechOnUnload() {
+function updateExportAvailability() {
+  /*
+   * Deliberately disabled:
+   *
+   * speechSynthesis does not provide a reliable audio file/stream that
+   * can be merged into a final video using only this browser API.
+   *
+   * Do not enable this button until a real local audio capture/render
+   * workflow has been implemented and verified.
+   */
+  if (exportButton) {
+    exportButton.disabled = true;
+    exportButton.title =
+      "वास्तविक audio-video export workflow अभी उपलब्ध नहीं है।";
+  }
+
+  if (downloadLink) {
+    downloadLink.hidden = true;
+    downloadLink.removeAttribute("href");
+  }
+}
+
+function handleExportClick() {
+  /*
+   * This is intentionally not a fake export.
+   * A final reel must contain:
+   * - selected image/video
+   * - actual audio track
+   * - synchronized text
+   * - 9:16 composition
+   * - watermark
+   *
+   * speechSynthesis alone cannot reliably provide an exportable audio
+   * track. Therefore no empty or silent video is generated here.
+   */
+  setMessage(
+    "रील एक्सपोर्ट अभी सक्रिय नहीं है, क्योंकि स्थानीय speechSynthesis की आवाज़ को वास्तविक audio track के रूप में सुरक्षित करके वीडियो में जोड़ना आवश्यक है।",
+    "info"
+  );
+}
+
+function handleTextInput() {
+  updateCharacterCount();
+
+  if (getText().length > MAX_TEXT_LENGTH) {
+    setMessage(
+      `सुविचार अधिकतम ${MAX_TEXT_LENGTH.toLocaleString("en-IN")} वर्णों का हो सकता है।`,
+      "error"
+    );
+  } else {
+    setMessage("", "info");
+  }
+
+  updateExportAvailability();
+}
+
+function handleLanguageChange() {
+  stopPreview();
+  stopSpeechSynthesis();
+
+  setMessage(
+    "भाषा बदल दी गई है। आवाज़ सुनने के लिए फिर से बटन दबाएँ।",
+    "info"
+  );
+}
+
+function handlePageVisibilityChange() {
+  if (document.hidden && isPreviewRunning) {
+    stopPreview();
+    setMessage("पेज छिपने के कारण Preview रोक दिया गया।", "info");
+  }
+}
+
+function initialize() {
+  updateCharacterCount();
+  loadVoices();
+  updateExportAvailability();
+
   if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
   }
+
+  if (mediaInput) {
+    mediaInput.addEventListener("change", (event) => {
+      const file = event.target.files?.[0] || null;
+      loadSelectedMedia(file);
+    });
+  }
+
+  if (textInput) {
+    textInput.addEventListener("input", handleTextInput);
+  }
+
+  if (languageSelect) {
+    languageSelect.addEventListener("change", handleLanguageChange);
+  }
+
+  if (speakButton) {
+    speakButton.addEventListener("click", () => {
+      if (currentUtterance) {
+        stopSpeechSynthesis();
+
+        if (speakButton) {
+          speakButton.textContent = "आवाज़ सुनें";
+        }
+
+        setAppStatus("तैयार", "ready");
+        setMessage("आवाज़ सुनना रोक दिया गया है।", "info");
+        currentUtterance = null;
+        return;
+      }
+
+      speakTextOnly();
+    });
+  }
+
+  if (previewPlayButton) {
+    previewPlayButton.addEventListener("click", startPreview);
+  }
+
+  if (exportButton) {
+    exportButton.addEventListener("click", handleExportClick);
+  }
+
+  document.addEventListener(
+    "visibilitychange",
+    handlePageVisibilityChange
+  );
+
+  window.addEventListener("beforeunload", () => {
+    stopPreview();
+    revokeMediaObjectUrl();
+    revokeExportedObjectUrl();
+  });
+
+  setAppStatus("तैयार", "ready");
 }
 
-textInput.addEventListener("input", updateText);
-mediaInput.addEventListener("change", handleMediaChange);
-speakButton.addEventListener("click", speakText);
-
-languageSelect.addEventListener("change", () => {
-  window.speechSynthesis?.cancel();
-  updateControls();
-});
-
-previewStage.addEventListener("dblclick", () => {
-  if (!previewVideo.hidden && previewVideo.paused) {
-    previewVideo.play().catch(() => {});
-  }
-});
-
-if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = updateControls;
-}
-
-window.addEventListener("beforeunload", stopSpeechOnUnload);
-
-resetPreview();
-updateText();
-
-void ttsAudio;
-void downloadLink;
+initialize();
