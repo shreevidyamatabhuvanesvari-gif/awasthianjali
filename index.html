@@ -2,14 +2,17 @@
 <html lang="hi">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1"
   >
+
   <meta
     name="description"
-    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ से vertical reel preview बनाने का browser-based studio."
+    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ के साथ vertical reel preview बनाने का browser-based studio."
   >
+
   <title>अंजली अवस्थी — Reel Studio</title>
 
   <link rel="stylesheet" href="styles.css">
@@ -18,10 +21,16 @@
 
 <body>
   <div class="app-shell">
+
+    <!-- ================= Header ================= -->
     <header class="app-header">
       <div class="app-brand">
         <p class="app-kicker">Reel Studio</p>
-        <h1 class="app-title">अंजली अवस्थी</h1>
+
+        <h1 class="app-title">
+          अंजली अवस्थी
+        </h1>
+
         <p class="app-subtitle">
           फोटो या वीडियो, सुविचार और स्थानीय TTS आवाज़ के साथ vertical reel तैयार करें।
         </p>
@@ -37,7 +46,9 @@
       </p>
     </header>
 
+    <!-- ================= Main Studio ================= -->
     <main class="studio-layout">
+
       <!-- ================= Editor Panel ================= -->
       <section
         class="editor-panel"
@@ -45,9 +56,13 @@
       >
         <div class="panel-heading">
           <div>
-            <h2 id="editorTitle" class="panel-title">
+            <h2
+              id="editorTitle"
+              class="panel-title"
+            >
               Reel तैयार करें
             </h2>
+
             <p class="panel-description">
               Media, टेक्स्ट और आवाज़ का चयन करें।
             </p>
@@ -55,6 +70,7 @@
         </div>
 
         <div class="control-stack">
+
           <!-- Media selection -->
           <div class="field">
             <label for="mediaInput">
@@ -86,13 +102,14 @@
               <option value="hi-IN">
                 सामान्य हिंदी
               </option>
+
               <option value="sa-IN">
                 सामान्य संस्कृत
               </option>
             </select>
 
             <p class="field-help">
-              उपलब्ध browser/system voice के अनुसार आवाज़ का परिणाम बदल सकता है।
+              परिणाम आपके browser/system में उपलब्ध voice पर निर्भर करेगा।
             </p>
           </div>
 
@@ -158,7 +175,7 @@
             </p>
 
             <p class="field-help">
-              फोटो की अवधि किसी fixed समय से निर्धारित नहीं होगी; वास्तविक TTS audio
+              फोटो की अवधि किसी fixed समय से निर्धारित नहीं होगी। वास्तविक TTS audio
               duration उपलब्ध होने पर उसी के अनुसार निर्धारित होगी।
             </p>
           </div>
@@ -191,12 +208,14 @@
             </a>
           </div>
 
+          <!-- Application message -->
           <p
             id="message"
             class="message"
             role="status"
             aria-live="polite"
           ></p>
+
         </div>
       </section>
 
@@ -215,12 +234,14 @@
           </span>
         </div>
 
+        <!-- Preview frame -->
         <div
           id="previewStage"
           class="preview-stage"
           aria-label="Reel preview"
         >
-          <!-- Image preview -->
+
+          <!-- Selected image -->
           <img
             id="previewImage"
             class="preview-media"
@@ -228,7 +249,7 @@
             hidden
           >
 
-          <!-- Video preview -->
+          <!-- Selected video -->
           <video
             id="previewVideo"
             class="preview-media"
@@ -237,7 +258,7 @@
             hidden
           ></video>
 
-          <!-- Empty state -->
+          <!-- Empty preview state -->
           <div
             id="emptyPreview"
             class="empty-preview"
@@ -256,7 +277,7 @@
             hidden
           ></div>
 
-          <!-- Locked watermark -->
+          <!-- Watermark: intentionally inside previewStage -->
           <div
             id="watermark"
             class="watermark"
@@ -265,7 +286,7 @@
             अंजली अवस्थी
           </div>
 
-          <!-- Universal Play button for both image and video -->
+          <!-- Universal Preview Play button -->
           <button
             id="previewPlayButton"
             class="preview-play-button"
@@ -282,15 +303,24 @@
               ▶
             </span>
           </button>
+
+          <!-- Preview status inside frame -->
+          <div
+            id="previewState"
+            class="preview-state"
+            aria-live="polite"
+          >
+            Preview तैयार नहीं है
+          </div>
+
         </div>
 
         <div class="preview-controls">
           <span
-            id="previewState"
             class="audio-status"
             aria-live="polite"
           >
-            Preview तैयार नहीं है
+            फोटो या वीडियो चुनने के बाद Preview Play करें।
           </span>
         </div>
 
@@ -298,13 +328,15 @@
           Play पर फोटो/वीडियो, आवाज़ और एक-पंक्ति टेक्स्ट Preview साथ चलेंगे।
         </p>
 
-        <!-- Hidden audio element reserved for actual generated audio data -->
+        <!-- Reserved audio element -->
         <audio
           id="ttsAudio"
           preload="metadata"
           hidden
         ></audio>
+
       </section>
+
     </main>
   </div>
 </body>
