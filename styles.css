@@ -1,311 +1,818 @@
-<!DOCTYPE html>
-<html lang="hi">
-<head>
-  <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
-  <meta
-    name="description"
-    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ से vertical reel preview बनाने का browser-based studio."
-  >
-  <title>अंजली अवस्थी — Reel Studio</title>
+/* =========================================================
+   Anjali Awasthi Reel Studio
+   Single-page responsive reel studio
+   ========================================================= */
 
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="app.js" defer></script>
-</head>
+/* ---------- Design tokens ---------- */
 
-<body>
-  <div class="app-shell">
-    <header class="app-header">
-      <div class="app-brand">
-        <p class="app-kicker">Reel Studio</p>
-        <h1 class="app-title">अंजली अवस्थी</h1>
-        <p class="app-subtitle">
-          फोटो या वीडियो, सुविचार और स्थानीय TTS आवाज़ के साथ vertical reel तैयार करें।
-        </p>
-      </div>
+:root {
+  color-scheme: dark;
 
-      <p
-        id="appStatus"
-        class="app-status"
-        role="status"
-        aria-live="polite"
-      >
-        तैयार
-      </p>
-    </header>
+  --color-background: #0b1020;
+  --color-surface: #121a2d;
+  --color-surface-soft: #18223a;
+  --color-surface-raised: #202d49;
 
-    <main class="studio-layout">
-      <!-- ================= Editor Panel ================= -->
-      <section
-        class="editor-panel"
-        aria-labelledby="editorTitle"
-      >
-        <div class="panel-heading">
-          <div>
-            <h2 id="editorTitle" class="panel-title">
-              Reel तैयार करें
-            </h2>
-            <p class="panel-description">
-              Media, टेक्स्ट और आवाज़ का चयन करें।
-            </p>
-          </div>
-        </div>
+  --color-border: #2c3a58;
+  --color-border-strong: #435477;
 
-        <div class="control-stack">
-          <!-- Media selection -->
-          <div class="field">
-            <label for="mediaInput">
-              फोटो या वीडियो चुनें
-            </label>
+  --color-text: #f5f7ff;
+  --color-text-soft: #b8c2d9;
+  --color-text-muted: #8793ad;
 
-            <input
-              id="mediaInput"
-              name="media"
-              type="file"
-              accept="image/*,video/*"
-            >
+  --color-primary: #8b5cf6;
+  --color-primary-hover: #a78bfa;
+  --color-primary-text: #ffffff;
 
-            <p class="field-help">
-              स्थानीय रूप से उपलब्ध फोटो या वीडियो चुनें।
-            </p>
-          </div>
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
 
-          <!-- Language selection -->
-          <div class="field">
-            <label for="languageSelect">
-              आवाज़ की भाषा
-            </label>
+  --color-preview-background: #050816;
 
-            <select
-              id="languageSelect"
-              name="language"
-            >
-              <option value="hi-IN">
-                सामान्य हिंदी
-              </option>
-              <option value="sa-IN">
-                सामान्य संस्कृत
-              </option>
-            </select>
+  --radius-small: 8px;
+  --radius-medium: 12px;
+  --radius-large: 18px;
+  --radius-extra-large: 24px;
 
-            <p class="field-help">
-              उपलब्ध browser/system voice के अनुसार आवाज़ का परिणाम बदल सकता है।
-            </p>
-          </div>
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 
-          <!-- Text input -->
-          <div class="field">
-            <label for="textInput">
-              सुविचार / बोलने वाला टेक्स्ट
-            </label>
+  --shadow-panel: 0 18px 55px rgba(0, 0, 0, 0.2);
+  --shadow-overlay: 0 3px 18px rgba(0, 0, 0, 0.55);
+}
 
-            <textarea
-              id="textInput"
-              name="text"
-              maxlength="10000"
-              rows="8"
-              placeholder="यहां अपना सुविचार लिखें..."
-              aria-describedby="textHelp charCount"
-            ></textarea>
+/* ---------- Base reset ---------- */
 
-            <div class="textarea-meta">
-              <p
-                id="textHelp"
-                class="field-help"
-              >
-                अधिकतम 10,000 वर्ण। Spaces, punctuation और line breaks भी गिने जाएंगे।
-              </p>
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-              <span
-                id="charCount"
-                class="char-count"
-                aria-live="polite"
-              >
-                0 / 10,000
-              </span>
-            </div>
-          </div>
+html {
+  min-width: 320px;
+  background: var(--color-background);
+}
 
-          <!-- Voice action -->
-          <div class="field">
-            <div class="action-row">
-              <button
-                id="speakButton"
-                class="button button-secondary"
-                type="button"
-              >
-                आवाज़ सुनें
-              </button>
-            </div>
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(139, 92, 246, 0.13),
+      transparent 32rem
+    ),
+    var(--color-background);
+  color: var(--color-text);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+}
 
-            <p class="field-help">
-              यह browser की उपलब्ध स्थानीय speech synthesis सुविधा का preview है।
-            </p>
-          </div>
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
 
-          <!-- Preview information -->
-          <div class="field">
-            <p class="field-label">
-              Preview नियम
-            </p>
+button,
+select,
+input[type="file"] {
+  cursor: pointer;
+}
 
-            <p class="field-help">
-              फोटो और वीडियो दोनों का Preview इसी पेज पर होगा। Preview में एक समय में
-              केवल एक पंक्ति प्रदर्शित होगी और पूरी पंक्ति multicolor शैली में दिखाई जाएगी।
-            </p>
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 
-            <p class="field-help">
-              फोटो की अवधि किसी fixed समय से निर्धारित नहीं होगी; वास्तविक TTS audio
-              duration उपलब्ध होने पर उसी के अनुसार निर्धारित होगी।
-            </p>
-          </div>
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(167, 139, 250, 0.75);
+  outline-offset: 3px;
+}
 
-          <!-- Export action -->
-          <div class="export-area">
-            <div class="action-row">
-              <button
-                id="exportButton"
-                class="button button-primary"
-                type="button"
-                disabled
-              >
-                Reel Export करें
-              </button>
-            </div>
+img,
+video {
+  display: block;
+  max-width: 100%;
+}
 
-            <p class="field-help">
-              Export सुविधा वास्तविक audio/video processing तैयार होने के बाद सक्रिय की जाएगी।
-            </p>
+/* ---------- App shell ---------- */
 
-            <a
-              id="downloadLink"
-              class="download-link"
-              href="#"
-              hidden
-              download
-            >
-              Reel डाउनलोड करें
-            </a>
-          </div>
+.app-shell {
+  width: min(100% - 2rem, 1280px);
+  margin: 0 auto;
+  padding: var(--space-8) 0;
+}
 
-          <p
-            id="message"
-            class="message"
-            role="status"
-            aria-live="polite"
-          ></p>
-        </div>
-      </section>
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
 
-      <!-- ================= Preview Panel ================= -->
-      <section
-        class="preview-panel"
-        aria-labelledby="previewTitle"
-      >
-        <div class="preview-heading">
-          <h2 id="previewTitle">
-            Preview
-          </h2>
+.app-brand {
+  min-width: 0;
+}
 
-          <span class="preview-badge">
-            9:16 Reel
-          </span>
-        </div>
+.app-kicker {
+  margin: 0 0 var(--space-2);
+  color: var(--color-primary-hover);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 
-        <div
-          id="previewStage"
-          class="preview-stage"
-          aria-label="Reel preview"
-        >
-          <!-- Image preview -->
-          <img
-            id="previewImage"
-            class="preview-media"
-            alt="चयनित फोटो का Preview"
-            hidden
-          >
+.app-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.65rem, 3vw, 2.5rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
 
-          <!-- Video preview -->
-          <video
-            id="previewVideo"
-            class="preview-media"
-            playsinline
-            preload="metadata"
-            hidden
-          ></video>
+.app-subtitle {
+  max-width: 680px;
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.98rem;
+}
 
-          <!-- Empty state -->
-          <div
-            id="emptyPreview"
-            class="empty-preview"
-          >
-            <span>
-              फोटो या वीडियो चुनने पर Preview यहां दिखाई देगा।
-            </span>
-          </div>
+.app-status {
+  flex: 0 0 auto;
+  max-width: 280px;
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(18, 26, 45, 0.85);
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
+  text-align: center;
+}
 
-          <!-- One-line multicolor text overlay -->
-          <div
-            id="textOverlay"
-            class="text-overlay multicolor-text"
-            aria-live="polite"
-            aria-label="Preview text"
-            hidden
-          ></div>
+/* ---------- Single-page main layout ---------- */
 
-          <!-- Locked watermark -->
-          <div
-            id="watermark"
-            class="watermark"
-            aria-label="Watermark"
-          >
-            अंजली अवस्थी
-          </div>
+/*
+  Desktop:
+  Editor remains on the left.
+  Preview remains on the right, at the same vertical level.
 
-          <!-- Universal Play button for both image and video -->
-          <button
-            id="previewPlayButton"
-            class="preview-play-button"
-            type="button"
-            aria-label="Preview चलाएं"
-            title="Preview चलाएं"
-            hidden
-          >
-            <span
-              id="previewPlayIcon"
-              class="preview-play-icon"
-              aria-hidden="true"
-            >
-              ▶
-            </span>
-          </button>
-        </div>
+  Mobile:
+  The two panels stack only because of limited screen width.
+*/
 
-        <div class="preview-controls">
-          <span
-            id="previewState"
-            class="audio-status"
-            aria-live="polite"
-          >
-            Preview तैयार नहीं है
-          </span>
-        </div>
+.studio-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
 
-        <p class="preview-caption">
-          Play पर फोटो/वीडियो, आवाज़ और एक-पंक्ति टेक्स्ट Preview साथ चलेंगे।
-        </p>
+.editor-panel,
+.preview-panel {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-extra-large);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(18, 26, 45, 0.98),
+      rgba(13, 20, 36, 0.98)
+    );
+  box-shadow: var(--shadow-panel);
+}
 
-        <!-- Hidden audio element reserved for actual generated audio data -->
-        <audio
-          id="ttsAudio"
-          preload="metadata"
-          hidden
-        ></audio>
-      </section>
-    </main>
-  </div>
-</body>
-</html>
+.editor-panel {
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+.preview-panel {
+  position: sticky;
+  top: 1rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+/* ---------- Panel headings ---------- */
+
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.panel-description {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+/* ---------- Form structure ---------- */
+
+.control-stack {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.field-label,
+.field > label {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.field-help {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+/* ---------- Inputs ---------- */
+
+.field input[type="file"],
+.field input[type="number"],
+.field input[type="text"],
+.field input[type="email"],
+.field select,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: rgba(5, 8, 22, 0.7);
+  color: var(--color-text);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.field input[type="file"],
+.field input[type="number"],
+.field input[type="text"],
+.field input[type="email"],
+.field select {
+  min-height: 2.85rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.field textarea {
+  min-height: 180px;
+  padding: 0.8rem;
+  resize: vertical;
+  line-height: 1.65;
+}
+
+.field input[type="file"] {
+  padding: 0.55rem;
+}
+
+.field input[type="file"]::file-selector-button {
+  margin-right: 0.65rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: var(--color-border-strong);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--color-primary-hover);
+  background: rgba(5, 8, 22, 0.9);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
+  outline: none;
+}
+
+.textarea-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.char-count {
+  flex: 0 0 auto;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Action buttons ---------- */
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.button {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-medium);
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.button-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  box-shadow: 0 8px 22px rgba(139, 92, 246, 0.22);
+}
+
+.button-primary:not(:disabled):hover {
+  background: var(--color-primary-hover);
+}
+
+.button-secondary {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.button-secondary:not(:disabled):hover {
+  border-color: var(--color-primary-hover);
+  background: #273555;
+}
+
+.button-ghost {
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text-soft);
+}
+
+.button-ghost:not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+/* ---------- Messages ---------- */
+
+.message {
+  min-height: 1.4rem;
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.85rem;
+}
+
+.message.is-success {
+  color: var(--color-success);
+}
+
+.message.is-warning {
+  color: var(--color-warning);
+}
+
+.message.is-error {
+  color: var(--color-danger);
+}
+
+/* ---------- Preview header ---------- */
+
+.preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.preview-heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.preview-badge {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------- 9:16 Preview stage ---------- */
+
+.preview-stage {
+  position: relative;
+  width: min(100%, 430px);
+  aspect-ratio: 9 / 16;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-large);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(139, 92, 246, 0.08),
+      transparent 45%
+    ),
+    var(--color-preview-background);
+  isolation: isolate;
+}
+
+.preview-stage::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.preview-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--color-preview-background);
+}
+
+.preview-media[hidden] {
+  display: none;
+}
+
+.empty-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.empty-preview[hidden] {
+  display: none;
+}
+
+/* ---------- One-line text overlay ---------- */
+
+/*
+  The Preview text is intentionally limited to one line.
+  JavaScript will control which text segment is currently shown.
+*/
+
+.text-overlay {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 14%;
+  left: 0.75rem;
+  z-index: 4;
+  display: block;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: clamp(0.95rem, 3.2vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: var(--shadow-overlay);
+  white-space: nowrap;
+  text-overflow: clip;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.text-overlay[hidden] {
+  display: none;
+}
+
+/*
+  The complete visible line is multicolor.
+  There is intentionally no special color treatment
+  for only the currently spoken word.
+*/
+
+.multicolor-text {
+  color: transparent;
+  background:
+    linear-gradient(
+      90deg,
+      #ff6b6b 0%,
+      #ffd166 22%,
+      #06d6a0 45%,
+      #4cc9f0 68%,
+      #c77dff 100%
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ---------- Universal Preview Play button ---------- */
+
+/*
+  This button is used for both photo and video.
+  Its visibility is controlled by app.js.
+  CSS does not hide it based on media type.
+*/
+
+.preview-play-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  display: inline-grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(5, 8, 22, 0.72);
+  color: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(10px);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.preview-play-button:not(:disabled):hover {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(139, 92, 246, 0.88);
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+.preview-play-button:not(:disabled):active {
+  transform: translate(-50%, -50%) scale(0.97);
+}
+
+.preview-play-button[hidden] {
+  display: none;
+}
+
+.preview-play-icon {
+  margin-left: 0.15rem;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+/* ---------- Preview state and caption ---------- */
+
+.preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.audio-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.audio-status::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 0.5rem;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  content: "";
+}
+
+.audio-status.is-ready {
+  color: var(--color-success);
+}
+
+.audio-status.is-ready::before {
+  background: var(--color-success);
+}
+
+.preview-caption {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* ---------- Watermark ---------- */
+
+.watermark {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.65rem;
+  z-index: 5;
+  max-width: calc(100% - 1.4rem);
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.55rem, 1.7vw, 0.72rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+/* ---------- Export area ---------- */
+
+.export-area {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: var(--radius-medium);
+  background: rgba(52, 211, 153, 0.12);
+  color: #a7f3d0;
+  font-size: 0.9rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.download-link:hover {
+  background: rgba(52, 211, 153, 0.2);
+}
+
+/* ---------- Utility states ---------- */
+
+[hidden] {
+  display: none !important;
+}
+
+.is-muted {
+  color: var(--color-text-muted);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ---------- Responsive behavior ---------- */
+
+/*
+  Keep the two panels side by side at desktop widths.
+  Stack only when the available width is insufficient.
+*/
+
+@media (max-width: 900px) {
+  .studio-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .preview-panel {
+    position: static;
+  }
+
+  .preview-stage {
+    width: min(100%, 430px);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(100% - 1rem, 1280px);
+    padding: var(--space-5) 0;
+  }
+
+  .app-header {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .app-status {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .editor-panel,
+  .preview-panel {
+    border-radius: var(--radius-large);
+    padding: 1rem;
+  }
+
+  .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .text-overlay {
+    right: 0.55rem;
+    left: 0.55rem;
+    font-size: clamp(0.8rem, 4.4vw, 1.15rem);
+  }
+
+  .preview-play-button {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .action-row > .button {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
