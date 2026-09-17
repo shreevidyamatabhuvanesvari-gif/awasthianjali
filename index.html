@@ -1,104 +1,234 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="hi">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="अंजली अवस्थी — फोटो या वीडियो, टेक्स्ट और स्थानीय TTS से 9:16 रील प्रिव्यू स्टूडियो।">
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <meta
+    name="description"
+    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ से vertical reel preview बनाने का browser-based studio."
+  >
   <title>अंजली अवस्थी — Reel Studio</title>
+
   <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js" defer></script>
 </head>
+
 <body>
   <div class="app-shell">
     <header class="app-header">
-      <div>
-        <p class="eyebrow">रील स्टूडियो</p>
-        <h1>अंजली अवस्थी</h1>
-        <p class="app-subtitle">फोटो/वीडियो + टेक्स्ट + स्थानीय TTS → 9:16 Reel</p>
+      <div class="app-brand">
+        <p class="app-kicker">Reel Studio</p>
+        <h1 class="app-title">अंजली अवस्थी</h1>
+        <p class="app-subtitle">
+          फोटो या वीडियो, सुविचार और स्थानीय TTS आवाज़ के साथ vertical reel तैयार करें।
+        </p>
       </div>
-      <div id="appStatus" class="app-status" role="status" aria-live="polite">तैयार</div>
+
+      <p
+        id="appStatus"
+        class="app-status"
+        role="status"
+        aria-live="polite"
+      >
+        तैयार
+      </p>
     </header>
 
     <main class="studio-layout">
-      <section class="control-panel" aria-labelledby="editorTitle">
-        <div class="section-heading">
-          <h2 id="editorTitle">रील तैयार करें</h2>
-          <p>सारी processing आपके browser में होगी।</p>
-        </div>
-
-        <div class="field">
-          <label for="mediaInput">फोटो या वीडियो</label>
-          <input
-            id="mediaInput"
-            type="file"
-            accept="image/*,video/*"
-          >
-          <p class="field-help">एक फोटो या एक वीडियो चुनें।</p>
-        </div>
-
-        <div class="field">
-          <label for="languageSelect">आवाज़ की भाषा</label>
-          <select id="languageSelect">
-            <option value="hi-IN">सामान्य हिंदी</option>
-            <option value="sa-IN">सामान्य संस्कृत</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <div class="field-label-row">
-            <label for="textInput">सुविचार / टेक्स्ट</label>
-            <span id="charCount" class="char-count">0 / 10,000</span>
+      <!-- ================= Editor Panel ================= -->
+      <section
+        class="editor-panel"
+        aria-labelledby="editorTitle"
+      >
+        <div class="panel-heading">
+          <div>
+            <h2 id="editorTitle" class="panel-title">
+              Reel तैयार करें
+            </h2>
+            <p class="panel-description">
+              Media, टेक्स्ट और आवाज़ का चयन करें।
+            </p>
           </div>
-          <textarea
-            id="textInput"
-            rows="9"
-            maxlength="10000"
-            placeholder="अपना सुविचार या अन्य टेक्स्ट लिखें…"
-            spellcheck="false"
-            aria-describedby="textHelp"
-          ></textarea>
-          <p id="textHelp" class="field-help">अधिकतम 10,000 वर्ण। Spaces, punctuation और line breaks भी वर्ण-गणना में शामिल होंगे।</p>
         </div>
 
-        <div class="field compact-field">
-          <label for="durationInput">फोटो की अवधि (सेकंड)</label>
-          <input
-            id="durationInput"
-            type="number"
-            min="1"
-            max="60"
-            step="1"
-            value="5"
-            inputmode="numeric"
-          >
-          <p class="field-help">TTS की अवधि इससे अधिक होने पर Preview कम अवधि पर समाप्त नहीं होगा।</p>
-        </div>
+        <div class="control-stack">
+          <!-- Media selection -->
+          <div class="field">
+            <label for="mediaInput">
+              फोटो या वीडियो चुनें
+            </label>
 
-        <div class="action-row">
-          <button id="speakButton" class="button button-secondary" type="button">
-            आवाज़ सुनें
-          </button>
-          <button id="exportButton" class="button button-primary" type="button" disabled>
-            Reel Export करें
-          </button>
-        </div>
+            <input
+              id="mediaInput"
+              name="media"
+              type="file"
+              accept="image/*,video/*"
+            >
 
-        <p id="message" class="message" role="status" aria-live="polite"></p>
+            <p class="field-help">
+              स्थानीय रूप से उपलब्ध फोटो या वीडियो चुनें।
+            </p>
+          </div>
+
+          <!-- Language selection -->
+          <div class="field">
+            <label for="languageSelect">
+              आवाज़ की भाषा
+            </label>
+
+            <select
+              id="languageSelect"
+              name="language"
+            >
+              <option value="hi-IN">
+                सामान्य हिंदी
+              </option>
+              <option value="sa-IN">
+                सामान्य संस्कृत
+              </option>
+            </select>
+
+            <p class="field-help">
+              उपलब्ध browser/system voice के अनुसार आवाज़ का परिणाम बदल सकता है।
+            </p>
+          </div>
+
+          <!-- Text input -->
+          <div class="field">
+            <label for="textInput">
+              सुविचार / बोलने वाला टेक्स्ट
+            </label>
+
+            <textarea
+              id="textInput"
+              name="text"
+              maxlength="10000"
+              rows="8"
+              placeholder="यहां अपना सुविचार लिखें..."
+              aria-describedby="textHelp charCount"
+            ></textarea>
+
+            <div class="textarea-meta">
+              <p
+                id="textHelp"
+                class="field-help"
+              >
+                अधिकतम 10,000 वर्ण। Spaces, punctuation और line breaks भी गिने जाएंगे।
+              </p>
+
+              <span
+                id="charCount"
+                class="char-count"
+                aria-live="polite"
+              >
+                0 / 10,000
+              </span>
+            </div>
+          </div>
+
+          <!-- Voice action -->
+          <div class="field">
+            <div class="action-row">
+              <button
+                id="speakButton"
+                class="button button-secondary"
+                type="button"
+              >
+                आवाज़ सुनें
+              </button>
+            </div>
+
+            <p class="field-help">
+              यह browser की उपलब्ध स्थानीय speech synthesis सुविधा का preview है।
+            </p>
+          </div>
+
+          <!-- Preview information -->
+          <div class="field">
+            <p class="field-label">
+              Preview नियम
+            </p>
+
+            <p class="field-help">
+              फोटो और वीडियो दोनों का Preview इसी पेज पर होगा। Preview में एक समय में
+              केवल एक पंक्ति प्रदर्शित होगी और पूरी पंक्ति multicolor शैली में दिखाई जाएगी।
+            </p>
+
+            <p class="field-help">
+              फोटो की अवधि किसी fixed समय से निर्धारित नहीं होगी; वास्तविक TTS audio
+              duration उपलब्ध होने पर उसी के अनुसार निर्धारित होगी।
+            </p>
+          </div>
+
+          <!-- Export action -->
+          <div class="export-area">
+            <div class="action-row">
+              <button
+                id="exportButton"
+                class="button button-primary"
+                type="button"
+                disabled
+              >
+                Reel Export करें
+              </button>
+            </div>
+
+            <p class="field-help">
+              Export सुविधा वास्तविक audio/video processing तैयार होने के बाद सक्रिय की जाएगी।
+            </p>
+
+            <a
+              id="downloadLink"
+              class="download-link"
+              href="#"
+              hidden
+              download
+            >
+              Reel डाउनलोड करें
+            </a>
+          </div>
+
+          <p
+            id="message"
+            class="message"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </div>
       </section>
 
-      <section class="preview-panel" aria-labelledby="previewTitle">
-        <div class="section-heading">
-          <h2 id="previewTitle">Preview</h2>
-          <p>9:16 vertical composition</p>
+      <!-- ================= Preview Panel ================= -->
+      <section
+        class="preview-panel"
+        aria-labelledby="previewTitle"
+      >
+        <div class="preview-heading">
+          <h2 id="previewTitle">
+            Preview
+          </h2>
+
+          <span class="preview-badge">
+            9:16 Reel
+          </span>
         </div>
 
-        <div id="previewStage" class="preview-stage" aria-label="रील प्रिव्यू">
+        <div
+          id="previewStage"
+          class="preview-stage"
+          aria-label="Reel preview"
+        >
+          <!-- Image preview -->
           <img
             id="previewImage"
             class="preview-media"
-            alt=""
+            alt="चयनित फोटो का Preview"
             hidden
           >
 
+          <!-- Video preview -->
           <video
             id="previewVideo"
             class="preview-media"
@@ -107,37 +237,75 @@
             hidden
           ></video>
 
-          <div id="textOverlay" class="text-overlay" aria-live="off"></div>
+          <!-- Empty state -->
+          <div
+            id="emptyPreview"
+            class="empty-preview"
+          >
+            <span>
+              फोटो या वीडियो चुनने पर Preview यहां दिखाई देगा।
+            </span>
+          </div>
 
-          <div id="watermark" class="watermark" aria-hidden="true">अंजली अवस्थी</div>
+          <!-- One-line multicolor text overlay -->
+          <div
+            id="textOverlay"
+            class="text-overlay multicolor-text"
+            aria-live="polite"
+            aria-label="Preview text"
+            hidden
+          ></div>
 
+          <!-- Locked watermark -->
+          <div
+            id="watermark"
+            class="watermark"
+            aria-label="Watermark"
+          >
+            अंजली अवस्थी
+          </div>
+
+          <!-- Universal Play button for both image and video -->
           <button
             id="previewPlayButton"
             class="preview-play-button"
             type="button"
-            aria-label="Preview चलाएँ"
-            title="Preview चलाएँ"
+            aria-label="Preview चलाएं"
+            title="Preview चलाएं"
             hidden
           >
-            <span id="previewPlayIcon" aria-hidden="true">▶</span>
+            <span
+              id="previewPlayIcon"
+              class="preview-play-icon"
+              aria-hidden="true"
+            >
+              ▶
+            </span>
           </button>
-
-          <p id="emptyPreview" class="empty-preview">
-            फोटो या वीडियो चुनें
-          </p>
         </div>
 
-        <audio id="ttsAudio" preload="auto" hidden></audio>
+        <div class="preview-controls">
+          <span
+            id="previewState"
+            class="audio-status"
+            aria-live="polite"
+          >
+            Preview तैयार नहीं है
+          </span>
+        </div>
 
-        <a id="downloadLink" hidden>रील डाउनलोड करें</a>
+        <p class="preview-caption">
+          Play पर फोटो/वीडियो, आवाज़ और एक-पंक्ति टेक्स्ट Preview साथ चलेंगे।
+        </p>
+
+        <!-- Hidden audio element reserved for actual generated audio data -->
+        <audio
+          id="ttsAudio"
+          preload="metadata"
+          hidden
+        ></audio>
       </section>
     </main>
   </div>
-
-  <noscript>
-    यह Reel Studio चलाने के लिए JavaScript सक्षम होना आवश्यक है।
-  </noscript>
-
-  <script type="module" src="app.js"></script>
 </body>
 </html>
