@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="अंजली अवस्थी — हिंदी और सामान्य संस्कृत TTS के साथ 9:16 reel studio">
+  <title>अंजली अवस्थी — Reel Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body>
+  <header class="app-header">
+    <div>
+      <h1>अंजली अवस्थी</h1>
+      <p>Reel Studio</p>
+    </div>
+
+    <span id="appStatus" class="status" aria-live="polite">तैयार</span>
+  </header>
+
+  <main class="studio">
+    <!-- Editor -->
+    <section class="editor" aria-label="Reel editor">
+
+      <div class="field">
+        <label for="mediaInput">फोटो या वीडियो</label>
+        <input
+          id="mediaInput"
+          type="file"
+          accept="image/*,video/*"
+        >
+      </div>
+
+      <div class="field">
+        <label for="languageSelect">भाषा</label>
+        <select id="languageSelect">
+          <option value="hi-IN">हिंदी</option>
+          <option value="sa-IN">संस्कृत</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="textInput">टेक्स्ट</label>
+        <textarea
+          id="textInput"
+          rows="7"
+          maxlength="2000"
+          placeholder="यहाँ हिंदी या सामान्य संस्कृत पाठ लिखें..."
+        ></textarea>
+        <div class="field-meta">
+          <span id="charCount">0 / 2000</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="speakButton" type="button">
+          आवाज़ बनाएँ
+        </button>
+
+        <button id="exportButton" type="button" disabled>
+          Reel Export करें
+        </button>
+      </div>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </section>
+
+    <!-- Preview -->
+    <section class="preview" aria-label="Reel preview">
+      <div class="preview-stage" id="previewStage">
+
+        <img
+          id="previewImage"
+          alt="चयनित फोटो का preview"
+          hidden
+        >
+
+        <video
+          id="previewVideo"
+          playsinline
+          muted
+          hidden
+        ></video>
+
+        <div
+          id="textOverlay"
+          class="text-overlay"
+          aria-live="polite"
+        ></div>
+
+        <div class="watermark">अंजली अवस्थी</div>
+
+        <div id="emptyPreview" class="preview-empty">
+          <span>9:16 Preview</span>
+          <small>फोटो या वीडियो चुनें</small>
+        </div>
+      </div>
+
+      <audio
+        id="ttsAudio"
+        controls
+        preload="none"
+        hidden
+      ></audio>
+
+      <a
+        id="downloadLink"
+        class="download-link"
+        hidden
+      >
+        Reel डाउनलोड करें
+      </a>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>स्थानीय प्रसंस्करण • बाहरी API नहीं</span>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
