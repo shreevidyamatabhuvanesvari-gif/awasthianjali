@@ -1,32 +1,40 @@
-const $ = (id) => document.getElementById(id);
+"use strict";
 
-const mediaInput = $("mediaInput");
-const languageSelect = $("languageSelect");
-const textInput = $("textInput");
-const charCount = $("charCount");
-const speakButton = $("speakButton");
-const exportButton = $("exportButton");
-const message = $("message");
-const appStatus = $("appStatus");
+/*
+ * Anjali Awasthi Reel Studio
+ *
+ * Features:
+ * - Image / video selection
+ * - Same-page 9:16 preview
+ * - Live multicolor word-by-word text
+ * - Continuous color chain across the whole thought
+ * - Local browser TTS preview
+ * - Video original audio mute/unmute
+ * - Fullscreen preview
+ * - Browser-side WebM reel export
+ *
+ * Important technical limitation:
+ * Browser speechSynthesis does not normally expose its generated
+ * voice as a reusable audio file or MediaStream. Therefore TTS can
+ * be previewed locally, but it cannot honestly be inserted into
+ * the exported video through speechSynthesis alone.
+ */
 
-const previewStage = $("previewStage");
-const previewImage = $("previewImage");
-const previewVideo = $("previewVideo");
-const textOverlay = $("textOverlay");
-const previewPlayButton = $("previewPlayButton");
-const previewPlayIcon = $("previewPlayIcon");
-const emptyPreview = $("emptyPreview");
-const ttsAudio = $("ttsAudio");
-const downloadLink = $("downloadLink");
+const MAX_TEXT_LENGTH = 10000;
+const PREVIEW_LINE_LIMIT = 72;
+
+const TTS_RATE = 0.92;
+const TTS_PITCH = 1;
+const TTS_VOLUME = 1;
 
 const EXPORT_WIDTH = 1080;
 const EXPORT_HEIGHT = 1920;
-const MAX_TEXT_LENGTH = 10000;
-const PREVIEW_FONT_FAMILY = '"Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif';
-const LINE_MAX_RATIO = 0.84;
+const EXPORT_FPS = 30;
 
-// पूरे सुविचार में color chain लगातार चलती है।
-// नई visible line शुरू होने पर color sequence reset नहीं होता।
+/*
+ * पूरे सुविचार में रंगों का क्रम लगातार चलता है।
+ * नई line पर sequence reset नहीं होता।
+ */
 const WORD_COLORS = [
   "#ff6b6b",
   "#ffd166",
@@ -36,720 +44,1078 @@ const WORD_COLORS = [
   "#ff8fab",
 ];
 
-const state = {
-  mediaUrl: "",
-  mediaKind: "",
-  sourceFile: null,
-  lines: [],
-  currentLine: -1,
-  speaking: false,
-  previewing: false,
-  speechRunId: 0,
-  voicesReady: false,
-  exportAudioReady: false,
-  exportBlob: null,
-  recorderMimeType: "",
-  videoFrameRequest: 0,
-};
+/* ---------- DOM references ---------- */
 
-function setStatus(text) {
-  appStatus.textContent = text;
-}
+const mediaInput = document.querySelector("#mediaInput");
+const languageSelect = document.querySelector("#languageSelect");
+const voiceSelect = document.querySelector("#voiceSelect");
+const textInput = document.querySelector("#textInput");
+const charCount = document.querySelector("#charCount");
+
+const speakButton = document.querySelector("#speakButton");
+const exportButton = document.querySelector("#exportButton");
+const downloadLink = document.querySelector("#downloadLink");
+
+const message = document.querySelector("#message");
+const appStatus = document.querySelector("#appStatus");
+
+const previewStage = document.querySelector("#previewStage");
+const previewImage = document.querySelector("#previewImage");
+const previewVideo = document.querySelector("#previewVideo");
+const emptyPreview = document.querySelector("#emptyPreview");
+
+const textOverlay = document.querySelector("#textOverlay");
+const watermark = document.querySelector("#watermark");
+
+const videoAudioButton = document.querySelector("#videoAudioButton");
+const videoAudioIcon = document.querySelector("#videoAudioIcon");
+
+const fullscreenButton = document.querySelector("#fullscreenButton");
+const fullscreenIcon = document.querySelector("#fullscreenIcon");
+
+const previewPlayButton = document.querySelector("#previewPlayButton");
+const previewPlayIcon = document.querySelector("#previewPlayIcon");
+
+const previewState = document.querySelector("#previewState");
+const audioStatus = document.querySelector("#audioStatus");
+const ttsAudio = document.querySelector("#ttsAudio");
+
+/* ---------- State ---------- */
+
+let mediaObjectUrl = null;
+let exportedObjectUrl = null;
+
+let selectedFile = null;
+let selectedMediaType = null;
+
+let previewLines = [];
+let currentLineIndex = 0;
+
+let currentUtterance = null;
+let previewRunId = 0;
+let isPreviewRunning = false;
+
+let availableVoices = [];
+let isVideoMuted = true;
+
+/* ---------- General helpers ---------- */
 
 function setMessage(text = "", type = "") {
+  if (!message) return;
+
   message.textContent = text;
-  message.className = `message${type ? ` ${type}` : ""}`;
-}
 
-function unicodeLength(value) {
-  return Array.from(value).length;
-}
-
-function updateCharCount() {
-  const length = unicodeLength(textInput.value);
-
-  charCount.textContent = `${length.toLocaleString("en-IN")} / 10,000`;
-
-  charCount.classList.toggle("near-limit", length >= 9000);
-  charCount.classList.toggle("at-limit", length >= MAX_TEXT_LENGTH);
-}
-
-function sanitizeText(value) {
-  return value.replace(/\r\n?/g, "\n");
-}
-
-function chooseVoice(lang) {
-  if (!("speechSynthesis" in window)) return null;
-
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-
-  const exact = voices.find(
-    (voice) => voice.lang.toLowerCase() === lang.toLowerCase()
+  message.classList.remove(
+    "is-success",
+    "is-warning",
+    "is-error"
   );
 
-  if (exact) return exact;
+  if (type === "success") {
+    message.classList.add("is-success");
+  }
 
-  const base = lang.split("-")[0].toLowerCase();
+  if (type === "warning") {
+    message.classList.add("is-warning");
+  }
 
-  return (
-    voices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(`${base}-`)
-    ) ||
-    voices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(base)
-    ) ||
-    null
-  );
+  if (type === "error") {
+    message.classList.add("is-error");
+  }
 }
 
-function splitLongLine(line, maxWidth) {
-  const words = line.trim().split(/\s+/).filter(Boolean);
-
-  if (!words.length) return [];
-
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-
-  if (!context) return [line.trim()];
-
-  const style = getComputedStyle(textOverlay);
-  const fontSize = Number.parseFloat(style.fontSize) || 30;
-  const fontWeight = style.fontWeight || "700";
-
-  context.font = `${fontWeight} ${fontSize}px ${PREVIEW_FONT_FAMILY}`;
-
-  const result = [];
-  let current = "";
-
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-
-    if (
-      current &&
-      context.measureText(candidate).width > maxWidth
-    ) {
-      result.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
+function setAppStatus(text = "") {
+  if (appStatus) {
+    appStatus.textContent = text;
   }
-
-  if (current) {
-    result.push(current);
-  }
-
-  return result;
 }
 
-function buildLines() {
-  const raw = sanitizeText(textInput.value);
-
-  if (!raw.trim()) return [];
-
-  const maxWidth = Math.max(
-    240,
-    (previewStage.clientWidth || 430) * LINE_MAX_RATIO
-  );
-
-  const sourceLines = raw.split("\n");
-  const result = [];
-
-  for (const sourceLine of sourceLines) {
-    if (!sourceLine.trim()) continue;
-
-    result.push(
-      ...splitLongLine(sourceLine, maxWidth)
-    );
+function setPreviewState(text = "") {
+  if (previewState) {
+    previewState.textContent = text;
   }
+}
 
-  return result.filter(Boolean);
+function setAudioStatus(text = "", ready = false) {
+  if (!audioStatus) return;
+
+  audioStatus.textContent = text;
+  audioStatus.classList.toggle("is-ready", ready);
+}
+
+function getText() {
+  return textInput ? textInput.value : "";
+}
+
+function getLanguage() {
+  return languageSelect?.value || "hi-IN";
+}
+
+function normalizeText(text) {
+  return String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/'/g, "&#039;");
+}
+
+/* ---------- Character count ---------- */
+
+function updateCharacterCount() {
+  if (!textInput || !charCount) return;
+
+  const length = textInput.value.length;
+
+  charCount.textContent =
+    `${length.toLocaleString("en-IN")} / ${MAX_TEXT_LENGTH.toLocaleString("en-IN")}`;
+
+  charCount.classList.remove(
+    "near-limit",
+    "at-limit"
+  );
+
+  if (length >= MAX_TEXT_LENGTH) {
+    charCount.classList.add("at-limit");
+  } else if (length >= 9000) {
+    charCount.classList.add("near-limit");
+  }
+}
+
+/* ---------- Validation ---------- */
+
+function validateText() {
+  const text = getText();
+
+  if (!text.trim()) {
+    return {
+      valid: false,
+      message: "कृपया पहले सुविचार लिखें।",
+    };
+  }
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    return {
+      valid: false,
+      message:
+        `सुविचार अधिकतम ${MAX_TEXT_LENGTH.toLocaleString("en-IN")} वर्णों का हो सकता है।`,
+    };
+  }
+
+  return {
+    valid: true,
+    message: "",
+  };
+}
+
+function validateMedia() {
+  if (!selectedFile || !selectedMediaType) {
+    return {
+      valid: false,
+      message: "कृपया पहले कोई फोटो या वीडियो चुनें।",
+    };
+  }
+
+  return {
+    valid: true,
+    message: "",
+  };
+}
+
+/* ---------- Object URL cleanup ---------- */
+
+function revokeMediaObjectUrl() {
+  if (mediaObjectUrl) {
+    URL.revokeObjectURL(mediaObjectUrl);
+    mediaObjectUrl = null;
+  }
+}
+
+function revokeExportedObjectUrl() {
+  if (exportedObjectUrl) {
+    URL.revokeObjectURL(exportedObjectUrl);
+    exportedObjectUrl = null;
+  }
+}
+
+/* ---------- Media loading ---------- */
+
+function resetMediaPreview() {
+  stopPreview();
+  revokeMediaObjectUrl();
+
+  selectedFile = null;
+  selectedMediaType = null;
+
+  if (previewImage) {
+    previewImage.pause?.();
+    previewImage.hidden = true;
+    previewImage.removeAttribute("src");
+  }
+
+  if (previewVideo) {
+    previewVideo.pause();
+    previewVideo.hidden = true;
+    previewVideo.removeAttribute("src");
+    previewVideo.load();
+  }
+
+  if (emptyPreview) {
+    emptyPreview.hidden = false;
+  }
+
+  if (videoAudioButton) {
+    videoAudioButton.hidden = true;
+  }
+
+  if (fullscreenButton) {
+    fullscreenButton.hidden = true;
+  }
+
+  if (previewPlayButton) {
+    previewPlayButton.hidden = true;
+  }
+
+  setPreviewState("Preview तैयार नहीं है");
+  setAudioStatus(
+    "फोटो या वीडियो चुनने के बाद Preview Play करें।",
+    false
+  );
+
+  updateExportAvailability();
+}
+
+function loadSelectedMedia(file) {
+  if (!file) {
+    resetMediaPreview();
+    return;
+  }
+
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+
+  if (!isImage && !isVideo) {
+    setMessage(
+      "कृपया केवल फोटो या वीडियो फाइल चुनें।",
+      "error"
+    );
+    return;
+  }
+
+  stopPreview();
+  revokeMediaObjectUrl();
+
+  selectedFile = file;
+  selectedMediaType = isImage ? "image" : "video";
+  mediaObjectUrl = URL.createObjectURL(file);
+
+  if (emptyPreview) {
+    emptyPreview.hidden = true;
+  }
+
+  if (isImage) {
+    if (previewVideo) {
+      previewVideo.pause();
+      previewVideo.hidden = true;
+      previewVideo.removeAttribute("src");
+      previewVideo.load();
+    }
+
+    if (previewImage) {
+      previewImage.src = mediaObjectUrl;
+      previewImage.alt = file.name || "चुनी गई फोटो";
+      previewImage.hidden = false;
+    }
+
+    if (videoAudioButton) {
+      videoAudioButton.hidden = true;
+    }
+
+    setPreviewState(
+      "फोटो तैयार है। Preview सुनने के लिए Play दबाएँ।"
+    );
+
+    setAudioStatus(
+      "फोटो तैयार है। Play दबाकर TTS Preview सुनें।",
+      true
+    );
+
+    setMessage(
+      "फोटो सफलतापूर्वक लोड हो गई है।",
+      "success"
+    );
+  } else {
+    isVideoMuted = true;
+
+    if (previewImage) {
+      previewImage.hidden = true;
+      previewImage.removeAttribute("src");
+    }
+
+    if (previewVideo) {
+      previewVideo.src = mediaObjectUrl;
+      previewVideo.hidden = false;
+      previewVideo.muted = true;
+      previewVideo.playsInline = true;
+      previewVideo.controls = false;
+      previewVideo.load();
+    }
+
+    if (videoAudioButton) {
+      videoAudioButton.hidden = false;
+      videoAudioButton.setAttribute(
+        "aria-label",
+        "वीडियो की मूल आवाज़ चालू करें"
+      );
+      videoAudioButton.setAttribute(
+        "aria-pressed",
+        "false"
+      );
+    }
+
+    if (videoAudioIcon) {
+      videoAudioIcon.textContent = "🔇";
+    }
+
+    setPreviewState(
+      "वीडियो तैयार है। Preview सुनने के लिए Play दबाएँ।"
+    );
+
+    setAudioStatus(
+      "वीडियो तैयार है। मूल आवाज़ डिफॉल्ट रूप से बंद है।",
+      true
+    );
+
+    setMessage(
+      "वीडियो सफलतापूर्वक लोड हो गया है।",
+      "success"
+    );
+  }
+
+  if (fullscreenButton) {
+    fullscreenButton.hidden = false;
+  }
+
+  updateExportAvailability();
+}
+
+/* ---------- Text line preparation ---------- */
+
+function splitLongTextIntoLines(text) {
+  const normalized = normalizeText(text);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const paragraphs = normalized
+    .split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  const lines = [];
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let currentLine = "";
+
+    for (const word of words) {
+      const candidate = currentLine
+        ? `${currentLine} ${word}`
+        : word;
+
+      if (
+        currentLine &&
+        candidate.length > PREVIEW_LINE_LIMIT
+      ) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = candidate;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+  }
+
+  return lines;
 }
 
 function wordCount(line) {
-  return line.trim()
+  return line && line.trim()
     ? line.trim().split(/\s+/).length
     : 0;
 }
 
 /*
- * दिए गए line के पहले कितने words आ चुके हैं।
- * इससे अगली line में color sequence वहीं से जारी रहती है।
+ * पूरे सुविचार में अब तक कितने words आ चुके हैं।
+ * इसी से अगली line का रंग तय होगा।
  */
-function lineStartWordIndex(index) {
-  if (index <= 0) return 0;
+function lineStartWordIndex(lineIndex) {
+  if (lineIndex <= 0) {
+    return 0;
+  }
 
   let count = 0;
 
-  for (let i = 0; i < index; i += 1) {
-    count += wordCount(state.lines[i] || "");
+  for (let index = 0; index < lineIndex; index += 1) {
+    count += wordCount(previewLines[index] || "");
   }
 
   return count;
 }
 
 /*
- * Preview के लिए हर word को अलग span मिलता है।
- * startWordIndex पूरे thought की continuous color chain बनाए रखता है।
+ * हर शब्द को अलग span में रखा जाता है।
+ * Color chain पूरे सुविचार में लगातार चलती है।
  */
-function createMulticolorLine(line, startWordIndex = 0) {
-  const words = line
+function createMulticolorLine(
+  line,
+  startWordIndex = 0
+) {
+  const words = String(line || "")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
 
-  if (!words.length) return "";
+  if (!words.length) {
+    return "";
+  }
 
   return words
     .map((word, index) => {
-      const colorClass =
+      const colorNumber =
         ((startWordIndex + index) % WORD_COLORS.length) + 1;
 
-      return `<span class="word-color-${colorClass}">${escapeHtml(word)}</span>`;
+      return `
+        <span class="word-color-${colorNumber}">
+          ${escapeHtml(word)}
+        </span>
+      `;
     })
     .join(" ");
 }
 
-function setOverlayLine(index) {
-  state.currentLine = index;
+function showLine(line, index = 0) {
+  if (!textOverlay) return;
 
-  if (index >= 0 && state.lines[index]) {
-    textOverlay.innerHTML = createMulticolorLine(
-      state.lines[index],
-      lineStartWordIndex(index)
-    );
-
-    textOverlay.dataset.lineIndex = String(index);
-  } else {
+  if (!line) {
     textOverlay.innerHTML = "";
-    textOverlay.removeAttribute("data-line-index");
-  }
-}
-
-function resetOverlay() {
-  state.currentLine = -1;
-  textOverlay.textContent = "";
-}
-
-function revokeMediaUrl() {
-  if (!state.mediaUrl) return;
-
-  URL.revokeObjectURL(state.mediaUrl);
-  state.mediaUrl = "";
-}
-
-function stopSourceVideo() {
-  previewVideo.pause();
-  previewVideo.onended = null;
-  previewVideo.currentTime = 0;
-}
-
-function clearMediaPreview() {
-  stopSourceVideo();
-  revokeMediaUrl();
-
-  state.sourceFile = null;
-  state.mediaKind = "";
-
-  previewImage.hidden = true;
-  previewVideo.hidden = true;
-
-  previewImage.removeAttribute("src");
-  previewVideo.removeAttribute("src");
-
-  emptyPreview.hidden = false;
-  previewPlayButton.hidden = true;
-
-  resetOverlay();
-}
-
-function loadMedia(file) {
-  stopPreview();
-  clearMediaPreview();
-
-  if (!file) {
-    updateExportState();
-    setStatus("तैयार");
+    textOverlay.hidden = true;
     return;
   }
 
-  if (
-    !file.type.startsWith("image/") &&
-    !file.type.startsWith("video/")
-  ) {
-    setMessage(
-      "कृपया केवल फोटो या वीडियो चुनें।",
-      "error"
-    );
-    return;
-  }
+  const startIndex = lineStartWordIndex(index);
 
-  state.sourceFile = file;
+  textOverlay.innerHTML = createMulticolorLine(
+    line,
+    startIndex
+  );
 
-  state.mediaKind = file.type.startsWith("image/")
-    ? "image"
-    : "video";
+  textOverlay.hidden = false;
+  textOverlay.dataset.lineIndex = String(index);
+}
 
-  state.mediaUrl = URL.createObjectURL(file);
+function preparePreviewLines() {
+  previewLines = splitLongTextIntoLines(getText());
+  currentLineIndex = 0;
 
-  if (state.mediaKind === "image") {
-    previewImage.src = state.mediaUrl;
-    previewImage.hidden = false;
-    previewImage.alt = "रील प्रिव्यू मीडिया";
-
-    previewImage.onload = () => {
-      emptyPreview.hidden = true;
-      previewPlayButton.hidden = !hasUsableText();
-
-      setStatus("फोटो तैयार है");
-      setMessage(
-        "Preview चलाकर टेक्स्ट और स्थानीय आवाज़ साथ सुनें।"
-      );
-    };
-
-    previewImage.onerror = () => {
-      setMessage(
-        "फोटो लोड नहीं हो सकी।",
-        "error"
-      );
-
-      clearMediaPreview();
-    };
+  if (previewLines.length) {
+    showLine(previewLines[0], 0);
   } else {
-    previewVideo.src = state.mediaUrl;
-    previewVideo.hidden = false;
-    previewVideo.load();
+    showLine("", 0);
+  }
+}
 
-    previewVideo.onloadedmetadata = () => {
-      emptyPreview.hidden = true;
-      previewPlayButton.hidden = !hasUsableText();
+/*
+ * Text input में लिखते ही पहली line Display पर दिखाई दे।
+ * इससे Play दबाने से पहले भी text visible रहेगा।
+ */
+function updateLiveTextDisplay() {
+  if (!textOverlay) return;
 
-      setStatus("वीडियो तैयार है");
-      setMessage(
-        "Preview चलाकर टेक्स्ट और स्थानीय आवाज़ साथ सुनें।"
-      );
-    };
+  const lines = splitLongTextIntoLines(getText());
+  previewLines = lines;
 
-    previewVideo.onerror = () => {
-      setMessage(
-        "वीडियो लोड नहीं हो सका।",
-        "error"
-      );
-
-      clearMediaPreview();
-    };
+  if (!lines.length) {
+    textOverlay.innerHTML = "";
+    textOverlay.hidden = true;
+    return;
   }
 
-  updateExportState();
+  showLine(lines[0], 0);
 }
 
-function hasUsableText() {
-  return textInput.value.trim().length > 0;
+/* ---------- Speech synthesis ---------- */
+
+function loadVoices() {
+  if (!("speechSynthesis" in window)) {
+    availableVoices = [];
+    return;
+  }
+
+  availableVoices =
+    window.speechSynthesis.getVoices() || [];
 }
 
-function stopSpeech() {
-  state.speechRunId += 1;
-  state.speaking = false;
+function getVoiceForLanguage(language) {
+  if (!availableVoices.length) {
+    return null;
+  }
 
+  const exact = availableVoices.find(
+    (voice) =>
+      voice.lang.toLowerCase() === language.toLowerCase()
+  );
+
+  if (exact) {
+    return exact;
+  }
+
+  const prefix = language
+    .split("-")[0]
+    .toLowerCase();
+
+  return (
+    availableVoices.find((voice) =>
+      voice.lang.toLowerCase().startsWith(`${prefix}-`)
+    ) ||
+    availableVoices.find((voice) =>
+      voice.lang.toLowerCase().startsWith(prefix)
+    ) ||
+    null
+  );
+}
+
+function stopSpeechSynthesis() {
   if ("speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
     } catch {
-      // Best effort.
+      // Ignore browser-specific cancellation errors.
     }
   }
+
+  currentUtterance = null;
 }
 
-function stopPreview() {
-  state.previewing = false;
-
-  stopSpeech();
-  stopSourceVideo();
-
-  previewPlayIcon.textContent = "▶";
-
-  previewPlayButton.hidden =
-    !state.mediaKind || !hasUsableText();
-
-  resetOverlay();
-}
-
-/*
- * Browser local SpeechSynthesis के माध्यम से lines को क्रम से बोलता है।
- * Preview होने पर current line visible रहती है।
- */
-function speakLines({ preview = false } = {}) {
-  if (!("speechSynthesis" in window)) {
-    setMessage(
-      "इस browser में स्थानीय Speech Synthesis उपलब्ध नहीं है।",
-      "error"
-    );
-
-    return Promise.resolve(false);
-  }
-
-  const text = textInput.value.trim();
-
-  if (!text) {
-    setMessage(
-      "पहले सुविचार / टेक्स्ट लिखें।",
-      "error"
-    );
-
-    return Promise.resolve(false);
-  }
-
-  const lang = languageSelect.value;
-  const voice = chooseVoice(lang);
-
-  if (!voice) {
-    setMessage(
-      `${
-        lang === "hi-IN" ? "हिंदी" : "संस्कृत"
-      } के लिए इस browser में कोई स्थानीय TTS voice उपलब्ध नहीं है।`,
-      "error"
-    );
-
-    return Promise.resolve(false);
-  }
-
-  state.lines = buildLines();
-
-  if (!state.lines.length) {
-    setMessage(
-      "सुविचार में बोलने योग्य टेक्स्ट नहीं है।",
-      "error"
-    );
-
-    return Promise.resolve(false);
-  }
-
-  stopSpeech();
-
-  const runId = state.speechRunId;
-  state.speaking = true;
-
-  return new Promise((resolve) => {
-    let index = 0;
-
-    const finish = (ok) => {
-      if (runId !== state.speechRunId) {
-        resolve(false);
-        return;
-      }
-
-      state.speaking = false;
-      resolve(ok);
-    };
-
-    const speakNext = () => {
-      if (runId !== state.speechRunId) {
-        finish(false);
-        return;
-      }
-
-      if (index >= state.lines.length) {
-        if (preview) {
-          setOverlayLine(-1);
-        }
-
-        finish(true);
-        return;
-      }
-
-      if (preview) {
-        setOverlayLine(index);
-      }
-
-      const utterance =
-        new SpeechSynthesisUtterance(
-          state.lines[index]
-        );
-
-      utterance.lang = lang;
-      utterance.voice = voice;
-      utterance.rate = 0.92;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-
-      utterance.onend = () => {
-        index += 1;
-        speakNext();
-      };
-
-      utterance.onerror = (event) => {
-        const reason =
-          event?.error || "unknown";
-
-        if (
-          reason === "canceled" ||
-          reason === "interrupted"
-        ) {
-          finish(false);
-          return;
-        }
-
-        setMessage(
-          `TTS playback में त्रुटि हुई: ${reason}`,
-          "error"
-        );
-
-        finish(false);
-      };
-
-      try {
-        window.speechSynthesis.speak(
-          utterance
-        );
-      } catch (error) {
-        setMessage(
-          `TTS playback शुरू नहीं हो सका: ${error.message}`,
-          "error"
-        );
-
-        finish(false);
-      }
-    };
-
-    speakNext();
-  });
-}
-
-async function listenOnly() {
-  if (state.speaking || state.previewing) {
+function finishPreview(runId) {
+  if (runId !== previewRunId) {
     return;
   }
 
-  setMessage("आवाज़ चल रही है…");
-  setStatus("आवाज़ चल रही है");
+  stopSpeechSynthesis();
 
-  speakButton.disabled = true;
-
-  const ok = await speakLines({
-    preview: false,
-  });
-
-  speakButton.disabled = false;
-
-  if (ok) {
-    setMessage("आवाज़ पूरी हो गई।");
-    setStatus("तैयार");
-  } else if (!state.speaking) {
-    setStatus("तैयार");
-  }
-}
-
-async function playPreview() {
-  if (state.previewing) {
-    return;
+  if (selectedMediaType === "video" && previewVideo) {
+    previewVideo.pause();
+    previewVideo.currentTime = 0;
   }
 
-  if (!state.mediaKind) {
-    setMessage(
-      "पहले फोटो या वीडियो चुनें।",
-      "error"
-    );
+  isPreviewRunning = false;
 
-    return;
+  if (previewPlayButton) {
+    previewPlayButton.hidden = false;
+    previewPlayButton.disabled = false;
   }
 
-  if (!hasUsableText()) {
-    setMessage(
-      "पहले सुविचार / टेक्स्ट लिखें।",
-      "error"
-    );
-
-    return;
+  if (speakButton) {
+    speakButton.disabled = false;
   }
 
-  const lang = languageSelect.value;
-
-  if (!chooseVoice(lang)) {
-    setMessage(
-      `${
-        lang === "hi-IN" ? "हिंदी" : "संस्कृत"
-      } के लिए इस browser में कोई स्थानीय TTS voice उपलब्ध नहीं है।`,
-      "error"
-    );
-
-    return;
+  if (previewPlayIcon) {
+    previewPlayIcon.textContent = "▶";
   }
 
-  stopSpeech();
-
-  state.previewing = true;
-  state.lines = buildLines();
-
-  resetOverlay();
-
-  previewPlayButton.hidden = true;
-  previewPlayIcon.textContent = "⏸";
-
-  setStatus("Preview चल रहा है");
-  setMessage(
-    "Visual और TTS आवाज़ साथ चल रही है…"
+  setAppStatus("तैयार");
+  setPreviewState(
+    "Preview समाप्त हो गया। फिर से चलाने के लिए Play दबाएँ।"
   );
 
-  const videoLoop = () => {
+  if (previewLines.length) {
+    showLine(previewLines[0], 0);
+  }
+}
+
+function speakLineAtIndex(index, runId) {
+  if (runId !== previewRunId) {
+    return;
+  }
+
+  if (index >= previewLines.length) {
+    finishPreview(runId);
+    return;
+  }
+
+  const line = previewLines[index];
+
+  currentLineIndex = index;
+  showLine(line, index);
+
+  if (!("speechSynthesis" in window)) {
+    finishPreview(runId);
+
+    setMessage(
+      "इस browser में स्थानीय आवाज़ उपलब्ध नहीं है।",
+      "error"
+    );
+
+    return;
+  }
+
+  const utterance =
+    new SpeechSynthesisUtterance(line);
+
+  const language = getLanguage();
+  const voice = getVoiceForLanguage(language);
+
+  utterance.lang = language;
+  utterance.rate = TTS_RATE;
+  utterance.pitch = TTS_PITCH;
+  utterance.volume = TTS_VOLUME;
+
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  utterance.onstart = () => {
+    if (runId !== previewRunId) return;
+
+    setPreviewState(
+      `पंक्ति ${index + 1} / ${previewLines.length} चल रही है`
+    );
+  };
+
+  utterance.onend = () => {
+    if (runId !== previewRunId) return;
+
+    speakLineAtIndex(index + 1, runId);
+  };
+
+  utterance.onerror = (event) => {
+    if (runId !== previewRunId) return;
+
     if (
-      !state.previewing ||
-      state.mediaKind !== "video"
+      event.error === "canceled" ||
+      event.error === "interrupted"
     ) {
       return;
     }
 
-    if (previewVideo.ended) {
-      try {
-        previewVideo.currentTime = 0;
-        void previewVideo.play();
-      } catch {
-        // Speech flow remains authoritative.
-      }
-    }
+    finishPreview(runId);
 
-    state.videoFrameRequest =
-      requestAnimationFrame(videoLoop);
+    setMessage(
+      "आवाज़ चलाते समय त्रुटि हुई। कृपया फिर प्रयास करें।",
+      "error"
+    );
   };
 
-  if (state.mediaKind === "video") {
-    try {
-      previewVideo.currentTime = 0;
-      await previewVideo.play();
+  currentUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+}
 
-      state.videoFrameRequest =
-        requestAnimationFrame(videoLoop);
-    } catch (error) {
-      state.previewing = false;
-
-      previewPlayButton.hidden = false;
-      previewPlayIcon.textContent = "▶";
-
-      setStatus("तैयार");
-
-      setMessage(
-        `वीडियो Preview शुरू नहीं हो सका: ${error.message}`,
-        "error"
-      );
-
-      return;
-    }
+function startVideoPreview() {
+  if (
+    selectedMediaType !== "video" ||
+    !previewVideo
+  ) {
+    return;
   }
 
-  const ok = await speakLines({
-    preview: true,
-  });
+  previewVideo.currentTime = 0;
+  previewVideo.muted = isVideoMuted;
 
-  cancelAnimationFrame(
-    state.videoFrameRequest
+  const playPromise = previewVideo.play();
+
+  if (
+    playPromise &&
+    typeof playPromise.catch === "function"
+  ) {
+    playPromise.catch(() => {
+      setMessage(
+        "वीडियो स्वतः नहीं चल पाया। Play button दबाकर फिर प्रयास करें।",
+        "warning"
+      );
+    });
+  }
+}
+
+function startPreview() {
+  const textResult = validateText();
+
+  if (!textResult.valid) {
+    setMessage(textResult.message, "error");
+    return;
+  }
+
+  const mediaResult = validateMedia();
+
+  if (!mediaResult.valid) {
+    setMessage(mediaResult.message, "error");
+    return;
+  }
+
+  if (!("speechSynthesis" in window)) {
+    setMessage(
+      "इस browser में speechSynthesis उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
+
+  stopPreview();
+  preparePreviewLines();
+
+  if (!previewLines.length) {
+    setMessage(
+      "Preview के लिए टेक्स्ट उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
+
+  previewRunId += 1;
+
+  const runId = previewRunId;
+
+  isPreviewRunning = true;
+
+  if (previewPlayButton) {
+    previewPlayButton.hidden = true;
+    previewPlayButton.disabled = true;
+  }
+
+  if (speakButton) {
+    speakButton.disabled = true;
+  }
+
+  if (previewPlayIcon) {
+    previewPlayIcon.textContent = "⏸";
+  }
+
+  setAppStatus("Preview चल रहा है…");
+  setPreviewState("Preview शुरू हो रहा है…");
+
+  setMessage(
+    "दृश्य, टेक्स्ट और स्थानीय TTS Preview साथ चल रहे हैं।"
   );
 
-  state.videoFrameRequest = 0;
+  startVideoPreview();
+  speakLineAtIndex(0, runId);
+}
 
-  stopSourceVideo();
+function stopPreview() {
+  previewRunId += 1;
 
-  state.previewing = false;
+  stopSpeechSynthesis();
 
-  previewPlayIcon.textContent = "▶";
-  previewPlayButton.hidden = false;
+  if (previewVideo) {
+    previewVideo.pause();
+  }
 
-  resetOverlay();
+  isPreviewRunning = false;
 
-  setStatus("तैयार");
+  if (previewPlayButton) {
+    previewPlayButton.hidden =
+      !selectedMediaType || !getText().trim();
 
-  if (ok) {
-    setMessage("Preview पूरा हो गया।");
+    previewPlayButton.disabled = false;
+  }
+
+  if (speakButton) {
+    speakButton.disabled = false;
+  }
+
+  if (previewPlayIcon) {
+    previewPlayIcon.textContent = "▶";
+  }
+
+  setAppStatus("तैयार");
+
+  if (previewLines.length) {
+    showLine(previewLines[0], 0);
   }
 }
 
-function getMediaElement() {
-  return state.mediaKind === "video"
-    ? previewVideo
-    : previewImage;
+function speakTextOnly() {
+  const result = validateText();
+
+  if (!result.valid) {
+    setMessage(result.message, "error");
+    return;
+  }
+
+  if (!("speechSynthesis" in window)) {
+    setMessage(
+      "इस browser में स्थानीय TTS सुविधा उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
+
+  if (currentUtterance) {
+    stopSpeechSynthesis();
+
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ सुनें";
+    }
+
+    setAppStatus("तैयार");
+    setMessage("आवाज़ रोक दी गई है।");
+    return;
+  }
+
+  const utterance =
+    new SpeechSynthesisUtterance(
+      normalizeText(getText())
+    );
+
+  const language = getLanguage();
+  const voice = getVoiceForLanguage(language);
+
+  utterance.lang = language;
+  utterance.rate = TTS_RATE;
+  utterance.pitch = TTS_PITCH;
+  utterance.volume = TTS_VOLUME;
+
+  if (voice) {
+    utterance.voice = voice;
+  }
+
+  utterance.onstart = () => {
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ रोकें";
+    }
+
+    setAppStatus("आवाज़ चल रही है…");
+    setMessage("स्थानीय TTS आवाज़ चल रही है।");
+  };
+
+  utterance.onend = () => {
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ सुनें";
+    }
+
+    setAppStatus("तैयार");
+    setMessage(
+      "आवाज़ सुनना पूरा हो गया।",
+      "success"
+    );
+
+    currentUtterance = null;
+  };
+
+  utterance.onerror = (event) => {
+    if (
+      event.error === "canceled" ||
+      event.error === "interrupted"
+    ) {
+      return;
+    }
+
+    if (speakButton) {
+      speakButton.textContent = "आवाज़ सुनें";
+    }
+
+    setAppStatus("तैयार");
+    setMessage(
+      "आवाज़ चलाते समय त्रुटि हुई।",
+      "error"
+    );
+
+    currentUtterance = null;
+  };
+
+  currentUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
 }
 
-function hasRealAudioSource() {
+/* ---------- Video original audio control ---------- */
+
+function updateVideoAudioButton() {
+  if (!videoAudioButton || !videoAudioIcon) {
+    return;
+  }
+
+  if (isVideoMuted) {
+    videoAudioIcon.textContent = "🔇";
+
+    videoAudioButton.setAttribute(
+      "aria-label",
+      "वीडियो की मूल आवाज़ चालू करें"
+    );
+
+    videoAudioButton.setAttribute(
+      "title",
+      "वीडियो की मूल आवाज़ चालू करें"
+    );
+
+    videoAudioButton.setAttribute(
+      "aria-pressed",
+      "false"
+    );
+  } else {
+    videoAudioIcon.textContent = "🔊";
+
+    videoAudioButton.setAttribute(
+      "aria-label",
+      "वीडियो की मूल आवाज़ बंद करें"
+    );
+
+    videoAudioButton.setAttribute(
+      "title",
+      "वीडियो की मूल आवाज़ बंद करें"
+    );
+
+    videoAudioButton.setAttribute(
+      "aria-pressed",
+      "true"
+    );
+  }
+}
+
+function toggleVideoAudio() {
   if (
-    ttsAudio.srcObject instanceof MediaStream
+    selectedMediaType !== "video" ||
+    !previewVideo
   ) {
-    return (
-      ttsAudio.srcObject.getAudioTracks().length > 0
+    return;
+  }
+
+  isVideoMuted = !isVideoMuted;
+  previewVideo.muted = isVideoMuted;
+
+  updateVideoAudioButton();
+
+  setAudioStatus(
+    isVideoMuted
+      ? "वीडियो की मूल आवाज़ बंद है।"
+      : "वीडियो की मूल आवाज़ चालू है।",
+    true
+  );
+}
+
+/* ---------- Fullscreen ---------- */
+
+function updateFullscreenButton() {
+  if (!fullscreenButton || !fullscreenIcon) {
+    return;
+  }
+
+  const isFullscreen =
+    document.fullscreenElement === previewStage;
+
+  fullscreenIcon.textContent =
+    isFullscreen ? "⛶" : "⛶";
+
+  fullscreenButton.setAttribute(
+    "aria-label",
+    isFullscreen
+      ? "Fullscreen बंद करें"
+      : "Preview fullscreen करें"
+  );
+
+  fullscreenButton.setAttribute(
+    "title",
+    isFullscreen
+      ? "Fullscreen बंद करें"
+      : "Fullscreen"
+  );
+}
+
+async function toggleFullscreen() {
+  if (!previewStage) {
+    return;
+  }
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (previewStage.requestFullscreen) {
+      await previewStage.requestFullscreen();
+    } else {
+      setMessage(
+        "इस browser में Fullscreen सुविधा उपलब्ध नहीं है।",
+        "warning"
+      );
+    }
+  } catch (error) {
+    setMessage(
+      `Fullscreen शुरू नहीं हो सका: ${error.message}`,
+      "error"
     );
   }
 
-  return Boolean(
-    ttsAudio.currentSrc || ttsAudio.src
-  );
+  updateFullscreenButton();
 }
 
-function audioIsReady() {
-  if (!hasRealAudioSource()) {
-    return false;
-  }
+/* ---------- Export helpers ---------- */
 
-  return (
-    Number.isFinite(ttsAudio.duration) &&
-    ttsAudio.duration > 0
-  );
-}
+function updateExportAvailability() {
+  /*
+   * Export तभी enable होगा जब media और text दोनों मौजूद हों।
+   * Export में selected media + synchronized visible text render होगा।
+   */
+  const canExport =
+    Boolean(selectedFile) &&
+    Boolean(selectedMediaType) &&
+    Boolean(getText().trim()) &&
+    Boolean(window.MediaRecorder) &&
+    Boolean(
+      HTMLCanvasElement.prototype.captureStream
+    );
 
-function updateExportState() {
-  state.exportAudioReady =
-    audioIsReady();
-
-  exportButton.disabled = !(
-    state.mediaKind &&
-    state.lines.length &&
-    state.exportAudioReady
-  );
-
-  if (!state.exportAudioReady) {
-    downloadLink.hidden = true;
-    downloadLink.removeAttribute("href");
+  if (exportButton) {
+    exportButton.disabled = !canExport;
+    exportButton.title = canExport
+      ? "9:16 Reel Export करें"
+      : "पहले फोटो/वीडियो और सुविचार चुनें";
   }
 }
 
-function pickRecorderMimeType(hasAudio) {
-  const candidates = hasAudio
-    ? [
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp8,opus",
-        "video/webm",
-      ]
-    : [
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm",
-      ];
+function pickRecorderMimeType() {
+  const types = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
 
   return (
-    candidates.find((type) =>
+    types.find((type) =>
       MediaRecorder.isTypeSupported(type)
     ) || ""
   );
 }
 
-function drawCover(ctx, element) {
+function drawCover(
+  context,
+  source,
+  width,
+  height
+) {
   const sourceWidth =
-    element.videoWidth ||
-    element.naturalWidth ||
-    element.width;
+    source.videoWidth ||
+    source.naturalWidth ||
+    source.width;
 
   const sourceHeight =
-    element.videoHeight ||
-    element.naturalHeight ||
-    element.height;
+    source.videoHeight ||
+    source.naturalHeight ||
+    source.height;
 
   if (!sourceWidth || !sourceHeight) {
+    context.fillStyle = "#050816";
+    context.fillRect(0, 0, width, height);
     return;
   }
 
@@ -757,7 +1123,7 @@ function drawCover(ctx, element) {
     sourceWidth / sourceHeight;
 
   const targetRatio =
-    EXPORT_WIDTH / EXPORT_HEIGHT;
+    width / height;
 
   let sx = 0;
   let sy = 0;
@@ -772,181 +1138,265 @@ function drawCover(ctx, element) {
     sy = (sourceHeight - sh) / 2;
   }
 
-  ctx.drawImage(
-    element,
+  context.drawImage(
+    source,
     sx,
     sy,
     sw,
     sh,
     0,
     0,
-    EXPORT_WIDTH,
-    EXPORT_HEIGHT
+    width,
+    height
   );
 }
 
+function getExportFontSize(line) {
+  const length = String(line || "").length;
+
+  if (length <= 24) return 76;
+  if (length <= 38) return 66;
+  if (length <= 52) return 56;
+  if (length <= 66) return 48;
+
+  return 42;
+}
+
 /*
- * Reel export में भी वही continuous word-color chain लागू होती है।
- * प्रत्येक word canvas पर अपने अलग रंग में draw होता है।
+ * Canvas पर हर word अलग रंग में draw होता है।
+ * startWordIndex continuous color chain बनाए रखता है।
  */
 function drawMulticolorLine(
-  ctx,
+  context,
   line,
   startWordIndex = 0
 ) {
   if (!line) return;
 
-  const fontSize = Math.min(
-    76,
-    Math.max(
-      34,
-      76 - Math.max(0, line.length - 26) * 0.65
-    )
-  );
-
-  ctx.font = `700 ${fontSize}px ${PREVIEW_FONT_FAMILY}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-
-  const words = line
+  const words = String(line)
     .trim()
     .split(/\s+/)
     .filter(Boolean);
 
   if (!words.length) return;
 
-  const gap = ctx.measureText(" ").width;
+  const fontSize = getExportFontSize(line);
 
-  const widths = words.map((word) =>
-    ctx.measureText(word).width
+  context.font =
+    `800 ${fontSize}px "Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif`;
+
+  context.textBaseline = "middle";
+  context.textAlign = "left";
+
+  const spaceWidth =
+    context.measureText(" ").width;
+
+  const wordWidths = words.map((word) =>
+    context.measureText(word).width
   );
 
   const totalWidth =
-    widths.reduce(
+    wordWidths.reduce(
       (sum, width) => sum + width,
       0
     ) +
-    gap *
-      Math.max(0, words.length - 1);
+    spaceWidth * (words.length - 1);
 
   let x =
     (EXPORT_WIDTH - totalWidth) / 2;
 
-  const y = EXPORT_HEIGHT * 0.77;
+  const y = EXPORT_HEIGHT * 0.76;
 
-  ctx.shadowColor =
-    "rgba(0, 0, 0, 0.62)";
+  context.shadowColor =
+    "rgba(0, 0, 0, 0.72)";
 
-  ctx.shadowBlur = 18;
+  context.shadowBlur = 18;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 3;
 
   words.forEach((word, index) => {
-    ctx.fillStyle =
+    context.fillStyle =
       WORD_COLORS[
         (startWordIndex + index) %
           WORD_COLORS.length
       ];
 
-    ctx.fillText(word, x, y);
+    context.fillText(word, x, y);
 
     x +=
-      widths[index] + gap;
+      wordWidths[index] + spaceWidth;
   });
 
-  ctx.shadowBlur = 0;
+  context.shadowBlur = 0;
+  context.shadowOffsetY = 0;
 }
 
-function drawWatermark(ctx) {
-  const fontSize = 24;
+function drawTopWatermark(context) {
+  const fontSize = 26;
 
-  ctx.font =
-    `600 ${fontSize}px ${PREVIEW_FONT_FAMILY}`;
+  context.font =
+    `700 ${fontSize}px "Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif`;
 
-  ctx.textAlign = "right";
-  ctx.textBaseline = "bottom";
+  context.textAlign = "right";
+  context.textBaseline = "top";
 
-  ctx.fillStyle =
-    "rgba(255,255,255,0.72)";
+  context.fillStyle =
+    "rgba(255, 255, 255, 0.82)";
 
-  ctx.fillText(
+  context.shadowColor =
+    "rgba(0, 0, 0, 0.75)";
+
+  context.shadowBlur = 8;
+
+  /*
+   * Watermark ऊपर दाएँ कोने में।
+   */
+  context.fillText(
     "अंजली अवस्थी",
     EXPORT_WIDTH - 38,
-    EXPORT_HEIGHT - 30
+    38
   );
+
+  context.shadowBlur = 0;
 }
 
-function parseLineTimings() {
-  const raw =
-    ttsAudio.dataset.lineTimings || "";
+function drawExportFrame(
+  context,
+  source,
+  line,
+  lineIndex
+) {
+  context.clearRect(
+    0,
+    0,
+    EXPORT_WIDTH,
+    EXPORT_HEIGHT
+  );
 
-  if (!raw) return [];
+  context.fillStyle = "#050816";
 
-  try {
-    const parsed = JSON.parse(raw);
+  context.fillRect(
+    0,
+    0,
+    EXPORT_WIDTH,
+    EXPORT_HEIGHT
+  );
 
-    if (!Array.isArray(parsed)) {
-      return [];
+  drawCover(
+    context,
+    source,
+    EXPORT_WIDTH,
+    EXPORT_HEIGHT
+  );
+
+  drawMulticolorLine(
+    context,
+    line,
+    lineStartWordIndex(lineIndex)
+  );
+
+  drawTopWatermark(context);
+}
+
+function waitForVideoMetadata(video) {
+  return new Promise((resolve, reject) => {
+    if (
+      video.readyState >= 1 &&
+      video.videoWidth &&
+      video.videoHeight
+    ) {
+      resolve();
+      return;
     }
 
-    return parsed
-      .map((item) => ({
-        start: Number(item?.start),
-        end: Number(item?.end),
-      }))
-      .filter(
-        (item) =>
-          Number.isFinite(item.start) &&
-          Number.isFinite(item.end) &&
-          item.end > item.start
+    const onLoaded = () => {
+      cleanup();
+      resolve();
+    };
+
+    const onError = () => {
+      cleanup();
+      reject(
+        new Error("वीडियो metadata लोड नहीं हो सका।")
       );
-  } catch {
-    return [];
-  }
+    };
+
+    const cleanup = () => {
+      video.removeEventListener(
+        "loadedmetadata",
+        onLoaded
+      );
+
+      video.removeEventListener(
+        "error",
+        onError
+      );
+    };
+
+    video.addEventListener(
+      "loadedmetadata",
+      onLoaded,
+      { once: true }
+    );
+
+    video.addEventListener(
+      "error",
+      onError,
+      { once: true }
+    );
+  });
 }
 
-function lineIndexForTime(
-  timings,
-  seconds
-) {
-  if (!timings.length) {
-    return -1;
+function getMediaDuration() {
+  if (selectedMediaType === "video" && previewVideo) {
+    return Number.isFinite(previewVideo.duration) &&
+      previewVideo.duration > 0
+      ? previewVideo.duration
+      : 5;
   }
 
-  const index = timings.findIndex(
-    (item) =>
-      seconds >= item.start &&
-      seconds < item.end
+  /*
+   * Photo reel के लिए TTS duration उपलब्ध नहीं होने पर
+   * सुरक्षित default duration रखा गया है।
+   */
+  return 10;
+}
+
+function getLineAtProgress(progress) {
+  if (!previewLines.length) {
+    return {
+      line: "",
+      index: 0,
+    };
+  }
+
+  const safeProgress =
+    Math.min(0.999999, Math.max(0, progress));
+
+  const index = Math.min(
+    previewLines.length - 1,
+    Math.floor(
+      safeProgress * previewLines.length
+    )
   );
 
-  if (index >= 0) {
-    return index;
-  }
-
-  if (
-    seconds >=
-    timings[timings.length - 1].end
-  ) {
-    return timings.length - 1;
-  }
-
-  return 0;
-}
-
-function resetDownload() {
-  if (state.exportBlob) {
-    state.exportBlob = null;
-  }
-
-  downloadLink.hidden = true;
-  downloadLink.removeAttribute("href");
+  return {
+    line: previewLines[index],
+    index,
+  };
 }
 
 async function exportReel() {
-  if (exportButton.disabled) {
-    setMessage(
-      "रील एक्सपोर्ट के लिए वास्तविक TTS audio track उपलब्ध नहीं है।",
-      "error"
-    );
+  const textResult = validateText();
+  const mediaResult = validateMedia();
 
+  if (!textResult.valid) {
+    setMessage(textResult.message, "error");
+    return;
+  }
+
+  if (!mediaResult.valid) {
+    setMessage(mediaResult.message, "error");
     return;
   }
 
@@ -955,24 +1405,29 @@ async function exportReel() {
     !HTMLCanvasElement.prototype.captureStream
   ) {
     setMessage(
-      "इस browser में local video recording API उपलब्ध नहीं है।",
+      "इस browser में video export सुविधा उपलब्ध नहीं है। Chrome या Edge के नवीनतम संस्करण में प्रयास करें।",
       "error"
     );
-
     return;
   }
 
-  const timings =
-    parseLineTimings();
+  const mimeType = pickRecorderMimeType();
 
-  if (
-    timings.length !== state.lines.length
-  ) {
+  if (!mimeType) {
     setMessage(
-      "Export रोक दिया गया है: वास्तविक TTS audio के line timings उपलब्ध नहीं हैं। अनुमानित timing का उपयोग नहीं किया जाएगा।",
+      "इस browser में समर्थित WebM recording format उपलब्ध नहीं है।",
       "error"
     );
+    return;
+  }
 
+  preparePreviewLines();
+
+  if (!previewLines.length) {
+    setMessage(
+      "Export के लिए टेक्स्ट उपलब्ध नहीं है।",
+      "error"
+    );
     return;
   }
 
@@ -982,79 +1437,76 @@ async function exportReel() {
   canvas.width = EXPORT_WIDTH;
   canvas.height = EXPORT_HEIGHT;
 
-  const ctx =
+  const context =
     canvas.getContext("2d");
 
-  if (!ctx) {
+  if (!context) {
     setMessage(
-      "Export canvas उपलब्ध नहीं है।",
+      "Canvas उपलब्ध नहीं है।",
       "error"
     );
-
     return;
   }
 
-  resetDownload();
+  const source =
+    selectedMediaType === "video"
+      ? previewVideo
+      : previewImage;
 
-  exportButton.disabled = true;
+  if (!source) {
+    setMessage(
+      "Export media उपलब्ध नहीं है।",
+      "error"
+    );
+    return;
+  }
 
-  setStatus(
-    "Reel render हो रही है"
-  );
+  if (selectedMediaType === "video") {
+    try {
+      await waitForVideoMetadata(source);
+    } catch (error) {
+      setMessage(error.message, "error");
+      return;
+    }
+  }
 
+  revokeExportedObjectUrl();
+
+  if (exportButton) {
+    exportButton.disabled = true;
+  }
+
+  setAppStatus("Reel render हो रही है…");
   setMessage(
-    "रील को browser के अंदर render किया जा रहा है…"
+    "9:16 Reel render की जा रही है। कृपया इस पेज को बंद न करें।"
   );
-
-  const mediaElement =
-    getMediaElement();
 
   const canvasStream =
-    canvas.captureStream(30);
+    canvas.captureStream(EXPORT_FPS);
 
   const outputStream =
     new MediaStream(
       canvasStream.getVideoTracks()
     );
 
-  let audioCleanup = null;
+  /*
+   * Video का original audio तभी जोड़ा जाएगा जब
+   * video captureStream उपलब्ध हो और audio track मिले।
+   */
+  let sourceStream = null;
 
   try {
     if (
-      typeof ttsAudio.captureStream !==
-      "function"
+      selectedMediaType === "video" &&
+      typeof source.captureStream === "function"
     ) {
-      throw new Error(
-        "Audio captureStream इस browser में उपलब्ध नहीं है।"
-      );
-    }
+      sourceStream = source.captureStream();
 
-    const audioStream =
-      ttsAudio.captureStream();
-
-    audioStream
-      .getAudioTracks()
-      .forEach((track) =>
-        outputStream.addTrack(track)
-      );
-
-    audioCleanup = () =>
-      audioStream
-        .getTracks()
-        .forEach((track) =>
-          track.stop()
-        );
-
-    const mimeType =
-      pickRecorderMimeType(
-        outputStream.getAudioTracks()
-          .length > 0
-      );
-
-    if (!mimeType) {
-      throw new Error(
-        "समर्थित WebM recording format उपलब्ध नहीं है।"
-      );
+      sourceStream
+        .getAudioTracks()
+        .forEach((track) => {
+          outputStream.addTrack(track);
+        });
     }
 
     const recorder =
@@ -1068,167 +1520,114 @@ async function exportReel() {
 
     const chunks = [];
 
-    const recorderDone =
-      new Promise(
-        (resolve, reject) => {
-          recorder.ondataavailable =
-            (event) => {
-              if (event.data?.size) {
-                chunks.push(
-                  event.data
-                );
-              }
-            };
+    const recorderFinished =
+      new Promise((resolve, reject) => {
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        };
 
-          recorder.onerror = () =>
-            reject(
-              recorder.error ||
-                new Error(
-                  "MediaRecorder error."
-                )
-            );
-
-          recorder.onstop = () =>
-            resolve();
-        }
-      );
-
-    ttsAudio.currentTime = 0;
-
-    if (state.mediaKind === "video") {
-      previewVideo.currentTime = 0;
-      await previewVideo.play();
-    }
-
-    await ttsAudio.play();
-
-    let exportFrame = 0;
-
-    const renderFrame = () => {
-      const currentTime =
-        ttsAudio.currentTime;
-
-      ctx.fillStyle = "#000";
-
-      ctx.fillRect(
-        0,
-        0,
-        EXPORT_WIDTH,
-        EXPORT_HEIGHT
-      );
-
-      drawCover(
-        ctx,
-        mediaElement
-      );
-
-      const currentLineIndex =
-        lineIndexForTime(
-          timings,
-          currentTime
-        );
-
-      /*
-       * महत्वपूर्ण:
-       * currentLine के पहले वाले सभी words की गिनती
-       * करके उसी point से color chain जारी होती है।
-       */
-      drawMulticolorLine(
-        ctx,
-        state.lines[
-          currentLineIndex
-        ] || "",
-        lineStartWordIndex(
-          currentLineIndex
-        )
-      );
-
-      drawWatermark(ctx);
-
-      if (
-        state.mediaKind === "video" &&
-        previewVideo.ended &&
-        !ttsAudio.ended
-      ) {
-        try {
-          previewVideo.currentTime = 0;
-          void previewVideo.play();
-        } catch {
-          // Last available video frame पर rendering जारी रखें।
-        }
-      }
-
-      if (
-        !ttsAudio.paused &&
-        !ttsAudio.ended
-      ) {
-        exportFrame =
-          requestAnimationFrame(
-            renderFrame
+        recorder.onerror = () => {
+          reject(
+            recorder.error ||
+              new Error("MediaRecorder में त्रुटि हुई।")
           );
+        };
+
+        recorder.onstop = () => {
+          resolve();
+        };
+      });
+
+    const duration = getMediaDuration();
+
+    let startedAt = performance.now();
+    let animationFrameId = 0;
+
+    if (selectedMediaType === "video") {
+      source.currentTime = 0;
+      source.muted = isVideoMuted;
+
+      const playPromise = source.play();
+
+      if (
+        playPromise &&
+        typeof playPromise.catch === "function"
+      ) {
+        await playPromise.catch(() => {
+          throw new Error(
+            "वीडियो export playback शुरू नहीं हो सका।"
+          );
+        });
       }
-    };
+    }
 
     recorder.start(250);
 
-    renderFrame();
+    const render = () => {
+      const elapsed =
+        (performance.now() - startedAt) / 1000;
 
-    await new Promise(
-      (resolve) => {
-        const end = () =>
-          resolve();
+      const progress =
+        Math.min(1, elapsed / duration);
 
-        if (ttsAudio.ended) {
-          end();
-        } else {
-          ttsAudio.addEventListener(
-            "ended",
-            end,
-            { once: true }
-          );
-        }
+      const current =
+        getLineAtProgress(progress);
+
+      drawExportFrame(
+        context,
+        source,
+        current.line,
+        current.index
+      );
+
+      if (progress < 1) {
+        animationFrameId =
+          requestAnimationFrame(render);
+      } else {
+        recorder.stop();
       }
-    );
+    };
 
-    cancelAnimationFrame(
-      exportFrame
-    );
+    render();
 
-    recorder.stop();
+    await recorderFinished;
 
-    await recorderDone;
+    cancelAnimationFrame(animationFrameId);
 
-    const blob = new Blob(
-      chunks,
-      { type: mimeType }
-    );
+    if (selectedMediaType === "video") {
+      source.pause();
+      source.currentTime = 0;
+    }
+
+    const blob =
+      new Blob(chunks, {
+        type: mimeType,
+      });
 
     if (!blob.size) {
       throw new Error(
-        "Export file खाली बन गई।"
+        "Export file खाली बनी है।"
       );
     }
 
-    state.exportBlob = blob;
-    state.recorderMimeType =
-      mimeType;
-
-    const url =
+    exportedObjectUrl =
       URL.createObjectURL(blob);
 
-    downloadLink.href = url;
-    downloadLink.download =
-      "anjali-awasthi-reel.webm";
+    if (downloadLink) {
+      downloadLink.href = exportedObjectUrl;
+      downloadLink.download =
+        "anjali-awasthi-reel.webm";
+      downloadLink.hidden = false;
+      downloadLink.textContent =
+        "रील डाउनलोड करें";
+    }
 
-    downloadLink.hidden = false;
-
-    downloadLink.textContent =
-      "रील डाउनलोड करें";
-
-    setStatus("Reel तैयार है");
-
+    setAppStatus("Reel तैयार है");
     setMessage(
-      "रील browser में तैयार हो गई है।"
+      "9:16 Reel तैयार हो गई है। Download link पर क्लिक करें।",
+      "success"
     );
   } catch (error) {
     setMessage(
@@ -1236,240 +1635,190 @@ async function exportReel() {
       "error"
     );
 
-    setStatus("तैयार");
+    setAppStatus("तैयार");
   } finally {
-    try {
-      ttsAudio.pause();
-      ttsAudio.currentTime = 0;
-    } catch {
-      // Best effort reset.
-    }
-
-    if (audioCleanup) {
-      audioCleanup();
+    if (sourceStream) {
+      sourceStream
+        .getTracks()
+        .forEach((track) => track.stop());
     }
 
     canvasStream
       .getTracks()
-      .forEach((track) =>
-        track.stop()
-      );
+      .forEach((track) => track.stop());
 
-    updateExportState();
+    if (selectedMediaType === "video" && source) {
+      source.pause();
+    }
+
+    updateExportAvailability();
   }
 }
 
-function attachTtsAudioSource(
-  source,
-  lineTimings
-) {
-  if (
-    !(source instanceof Blob) &&
-    typeof source !== "string"
-  ) {
-    throw new TypeError(
-      "TTS source must be a Blob or URL string."
-    );
-  }
+/* ---------- Input handlers ---------- */
 
-  if (
-    !Array.isArray(lineTimings) ||
-    lineTimings.length !==
-      state.lines.length
-  ) {
-    throw new Error(
-      "प्रत्येक visible line के लिए वास्तविक start/end timing आवश्यक है।"
-    );
-  }
+function handleTextInput() {
+  updateCharacterCount();
+  updateLiveTextDisplay();
 
-  ttsAudio.pause();
-
-  if (ttsAudio.src) {
-    URL.revokeObjectURL(
-      ttsAudio.src
-    );
-  }
-
-  ttsAudio.removeAttribute(
-    "src"
-  );
-
-  ttsAudio.dataset.lineTimings =
-    JSON.stringify(
-      lineTimings
-    );
-
-  if (source instanceof Blob) {
-    ttsAudio.src =
-      URL.createObjectURL(
-        source
-      );
-  } else {
-    ttsAudio.src = source;
-  }
-
-  ttsAudio.load();
-}
-
-function handleTtsAudioReady() {
-  updateExportState();
-}
-
-function handleTextChange() {
-  updateCharCount();
-
-  resetOverlay();
-
-  state.lines =
-    buildLines();
-
-  previewPlayButton.hidden =
-    !state.mediaKind ||
-    !hasUsableText();
-
-  updateExportState();
-}
-
-function refreshVoices() {
-  state.voicesReady =
-    "speechSynthesis" in window &&
-    window.speechSynthesis
-      .getVoices()
-      .length > 0;
-}
-
-function removeLegacyDurationControl() {
-  const durationInput =
-    $("durationInput");
-
-  if (!durationInput) return;
-
-  const field =
-    durationInput.closest(
-      ".field"
-    );
-
-  if (field) {
-    field.remove();
-  } else {
-    durationInput.remove();
-  }
-}
-
-mediaInput.addEventListener(
-  "change",
-  (event) => {
-    loadMedia(
-      event.target.files?.[0] ||
-        null
-    );
-  }
-);
-
-textInput.addEventListener(
-  "input",
-  handleTextChange
-);
-
-languageSelect.addEventListener(
-  "change",
-  () => {
-    stopPreview();
-
+  if (getText().length > MAX_TEXT_LENGTH) {
     setMessage(
-      "भाषा बदल दी गई है। Preview से नई भाषा जाँचें।"
+      `सुविचार अधिकतम ${MAX_TEXT_LENGTH.toLocaleString("en-IN")} वर्णों का हो सकता है।`,
+      "error"
     );
+    return;
   }
+
+  if (getText().trim()) {
+    setMessage("");
+  }
+
+  if (previewPlayButton) {
+    previewPlayButton.hidden =
+      !selectedMediaType ||
+      !getText().trim();
+  }
+
+  updateExportAvailability();
+}
+
+function handleLanguageChange() {
+  stopPreview();
+  stopSpeechSynthesis();
+
+  if (speakButton) {
+    speakButton.textContent = "आवाज़ सुनें";
+  }
+
+  setMessage(
+    "भाषा बदल दी गई है। आवाज़ सुनने के लिए फिर से बटन दबाएँ।"
+  );
+}
+
+function handleVoiceChange() {
+  stopPreview();
+  stopSpeechSynthesis();
+
+  if (speakButton) {
+    speakButton.textContent = "आवाज़ सुनें";
+  }
+
+  setMessage(
+    "आवाज़ विकल्प बदल दिया गया है।"
+  );
+}
+
+/* ---------- Event listeners ---------- */
+
+if (mediaInput) {
+  mediaInput.addEventListener("change", (event) => {
+    const file =
+      event.target.files?.[0] || null;
+
+    loadSelectedMedia(file);
+  });
+}
+
+if (textInput) {
+  textInput.addEventListener(
+    "input",
+    handleTextInput
+  );
+}
+
+if (languageSelect) {
+  languageSelect.addEventListener(
+    "change",
+    handleLanguageChange
+  );
+}
+
+if (voiceSelect) {
+  voiceSelect.addEventListener(
+    "change",
+    handleVoiceChange
+  );
+}
+
+if (speakButton) {
+  speakButton.addEventListener(
+    "click",
+    speakTextOnly
+  );
+}
+
+if (previewPlayButton) {
+  previewPlayButton.addEventListener(
+    "click",
+    startPreview
+  );
+}
+
+if (videoAudioButton) {
+  videoAudioButton.addEventListener(
+    "click",
+    toggleVideoAudio
+  );
+}
+
+if (fullscreenButton) {
+  fullscreenButton.addEventListener(
+    "click",
+    toggleFullscreen
+  );
+}
+
+if (exportButton) {
+  exportButton.addEventListener(
+    "click",
+    exportReel
+  );
+}
+
+document.addEventListener(
+  "fullscreenchange",
+  updateFullscreenButton
 );
 
-speakButton.addEventListener(
-  "click",
-  listenOnly
-);
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.hidden && isPreviewRunning) {
+      stopPreview();
 
-previewPlayButton.addEventListener(
-  "click",
-  playPreview
-);
-
-exportButton.addEventListener(
-  "click",
-  exportReel
-);
-
-ttsAudio.addEventListener(
-  "loadedmetadata",
-  handleTtsAudioReady
-);
-
-ttsAudio.addEventListener(
-  "durationchange",
-  handleTtsAudioReady
+      setMessage(
+        "पेज छिपने के कारण Preview रोक दिया गया।"
+      );
+    }
+  }
 );
 
 window.addEventListener(
   "beforeunload",
   () => {
     stopPreview();
-
-    revokeMediaUrl();
-
-    if (
-      ttsAudio.src?.startsWith(
-        "blob:"
-      )
-    ) {
-      URL.revokeObjectURL(
-        ttsAudio.src
-      );
-    }
+    revokeMediaObjectUrl();
+    revokeExportedObjectUrl();
   }
 );
 
-if (
-  "speechSynthesis" in window
-) {
-  window.speechSynthesis.addEventListener(
-    "voiceschanged",
-    refreshVoices
-  );
+/* ---------- Initialization ---------- */
 
-  refreshVoices();
-} else {
-  speakButton.disabled = true;
+function initialize() {
+  updateCharacterCount();
+  updateLiveTextDisplay();
+  loadVoices();
+  updateVideoAudioButton();
+  updateFullscreenButton();
+  updateExportAvailability();
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.onvoiceschanged =
+      loadVoices;
+  }
+
+  setAppStatus("तैयार");
+  setPreviewState("Preview तैयार नहीं है");
 }
 
-removeLegacyDurationControl();
-
-updateCharCount();
-
-state.lines =
-  buildLines();
-
-updateExportState();
-
-setStatus("तैयार");
-
-window.reelStudio =
-  Object.freeze({
-    attachTtsAudioSource,
-    stopPreview,
-
-    getState: () => ({
-      mediaKind:
-        state.mediaKind,
-
-      lines: [
-        ...state.lines,
-      ],
-
-      speaking:
-        state.speaking,
-
-      previewing:
-        state.previewing,
-
-      exportAudioReady:
-        state.exportAudioReady,
-    }),
-  });
+initialize();
