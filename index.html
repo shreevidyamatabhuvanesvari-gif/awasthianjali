@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ के साथ vertical reel preview बनाने का browser-based studio."
+    content="अंजली अवस्थी Reel Studio — फोटो या वीडियो, टेक्स्ट और स्थानीय आवाज़ के साथ vertical reel preview और export बनाने का browser-based studio."
   >
 
   <title>अंजली अवस्थी — Reel Studio</title>
@@ -32,7 +32,7 @@
         </h1>
 
         <p class="app-subtitle">
-          फोटो या वीडियो, सुविचार और स्थानीय TTS आवाज़ के साथ vertical reel तैयार करें।
+          फोटो या वीडियो, सुविचार और स्थानीय TTS आवाज़ के साथ 9:16 Reel तैयार करें।
         </p>
       </div>
 
@@ -64,7 +64,7 @@
             </h2>
 
             <p class="panel-description">
-              Media, टेक्स्ट और आवाज़ का चयन करें।
+              Media, टेक्स्ट, भाषा और आवाज़ का चयन करें।
             </p>
           </div>
         </div>
@@ -109,7 +109,31 @@
             </select>
 
             <p class="field-help">
-              परिणाम आपके browser/system में उपलब्ध voice पर निर्भर करेगा।
+              हिंदी पहला विकल्प और संस्कृत दूसरा विकल्प है।
+            </p>
+          </div>
+
+          <!-- Voice selection -->
+          <div class="field">
+            <label for="voiceSelect">
+              आवाज़
+            </label>
+
+            <select
+              id="voiceSelect"
+              name="voice"
+            >
+              <option value="1">
+                1
+              </option>
+
+              <option value="2">
+                2
+              </option>
+            </select>
+
+            <p class="field-help">
+              आवाज़ 1 या 2 में से चुनें।
             </p>
           </div>
 
@@ -159,7 +183,7 @@
             </div>
 
             <p class="field-help">
-              यह browser की उपलब्ध स्थानीय speech synthesis सुविधा का preview है।
+              चुनी गई भाषा और आवाज़ के अनुसार स्थानीय browser speech synthesis का Preview।
             </p>
           </div>
 
@@ -170,13 +194,22 @@
             </p>
 
             <p class="field-help">
-              फोटो और वीडियो दोनों का Preview इसी पेज पर होगा। Preview में एक समय में
-              केवल एक पंक्ति प्रदर्शित होगी और पूरी पंक्ति multicolor शैली में दिखाई जाएगी।
+              फोटो और वीडियो दोनों का Preview इसी पेज पर होगा।
+              एक समय में केवल एक पंक्ति प्रदर्शित होगी और पूरी दिखाई देने वाली
+              पंक्ति multicolor शैली में रहेगी।
             </p>
 
             <p class="field-help">
-              फोटो की अवधि किसी fixed समय से निर्धारित नहीं होगी। वास्तविक TTS audio
-              duration उपलब्ध होने पर उसी के अनुसार निर्धारित होगी।
+              टेक्स्ट की पंक्ति वास्तविक TTS audio timing के अनुसार बदलेगी।
+            </p>
+
+            <p class="field-help">
+              फोटो की अवधि fixed समय से निर्धारित नहीं होगी; उपलब्ध वास्तविक
+              TTS audio duration के अनुसार Preview और Reel की अवधि निर्धारित होगी।
+            </p>
+
+            <p class="field-help">
+              वीडियो का original audio डिफॉल्ट रूप से चालू रहेगा और अलग से mute/unmute किया जा सकेगा।
             </p>
           </div>
 
@@ -194,7 +227,7 @@
             </div>
 
             <p class="field-help">
-              Export सुविधा वास्तविक audio/video processing तैयार होने के बाद सक्रिय की जाएगी।
+              तैयार Preview के आधार पर 9:16 Reel Export करें।
             </p>
 
             <a
@@ -234,11 +267,11 @@
           </span>
         </div>
 
-        <!-- Preview frame -->
+        <!-- Entire preview frame is the fullscreen target -->
         <div
           id="previewStage"
           class="preview-stage"
-          aria-label="Reel preview"
+          aria-label="9:16 Reel Preview"
         >
 
           <!-- Selected image -->
@@ -277,7 +310,7 @@
             hidden
           ></div>
 
-          <!-- Watermark: intentionally inside previewStage -->
+          <!-- Watermark -->
           <div
             id="watermark"
             class="watermark"
@@ -286,7 +319,42 @@
             अंजली अवस्थी
           </div>
 
-          <!-- Universal Preview Play button -->
+          <!-- Video original-audio control -->
+          <button
+            id="videoAudioButton"
+            class="preview-control-button video-audio-button"
+            type="button"
+            aria-label="वीडियो की मूल आवाज़ बंद करें"
+            aria-pressed="false"
+            title="वीडियो की मूल आवाज़"
+            hidden
+          >
+            <span
+              id="videoAudioIcon"
+              aria-hidden="true"
+            >
+              🔊
+            </span>
+          </button>
+
+          <!-- Fullscreen control for entire preview stage -->
+          <button
+            id="fullscreenButton"
+            class="preview-control-button fullscreen-button"
+            type="button"
+            aria-label="Preview fullscreen करें"
+            title="Fullscreen"
+            hidden
+          >
+            <span
+              id="fullscreenIcon"
+              aria-hidden="true"
+            >
+              ⛶
+            </span>
+          </button>
+
+          <!-- Universal centered Preview Play button -->
           <button
             id="previewPlayButton"
             class="preview-play-button"
@@ -317,6 +385,7 @@
 
         <div class="preview-controls">
           <span
+            id="audioStatus"
             class="audio-status"
             aria-live="polite"
           >
@@ -325,10 +394,10 @@
         </div>
 
         <p class="preview-caption">
-          Play पर फोटो/वीडियो, आवाज़ और एक-पंक्ति टेक्स्ट Preview साथ चलेंगे।
+          Play पर फोटो/वीडियो, TTS आवाज़ और एक-पंक्ति टेक्स्ट Preview साथ चलेंगे।
         </p>
 
-        <!-- Reserved audio element -->
+        <!-- Reserved audio element for local TTS playback -->
         <audio
           id="ttsAudio"
           preload="metadata"
