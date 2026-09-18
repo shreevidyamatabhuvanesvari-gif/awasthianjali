@@ -1,39 +1,40 @@
 /* =========================================================
    Anjali Awasthi Reel Studio
-   Single-page responsive reel studio
+   Global single-page studio styles
    ========================================================= */
-
-/* ---------- Design tokens ---------- */
 
 :root {
   color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
 
-  --color-background: #0b1020;
-  --color-surface: #121a2d;
-  --color-surface-soft: #18223a;
-  --color-surface-raised: #202d49;
+  --bg: #0b1020;
+  --surface: #121a2d;
+  --surface-soft: #18223a;
+  --surface-raised: #1d2944;
+  --border: #2c3a58;
+  --border-strong: #435477;
 
-  --color-border: #2c3a58;
-  --color-border-strong: #435477;
+  --text: #f5f7ff;
+  --text-soft: #b8c2d9;
+  --text-muted: #8793ad;
 
-  --color-text: #f5f7ff;
-  --color-text-soft: #b8c2d9;
-  --color-text-muted: #8793ad;
+  --primary: #8b5cf6;
+  --primary-hover: #a78bfa;
+  --primary-contrast: #ffffff;
 
-  --color-primary: #8b5cf6;
-  --color-primary-hover: #a78bfa;
-  --color-primary-text: #ffffff;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
 
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-danger: #fb7185;
+  --preview-bg: #050816;
+  --overlay-shadow: 0 3px 18px rgba(0, 0, 0, 0.55);
 
-  --color-preview-background: #050816;
-
-  --radius-small: 8px;
-  --radius-medium: 12px;
-  --radius-large: 18px;
-  --radius-extra-large: 24px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -42,13 +43,9 @@
   --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
-
-  --shadow-panel: 0 18px 55px rgba(0, 0, 0, 0.2);
-  --shadow-overlay: 0 3px 18px rgba(0, 0, 0, 0.55);
-  --shadow-control: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-/* ---------- Base reset ---------- */
+/* ---------- Base ---------- */
 
 *,
 *::before,
@@ -58,33 +55,17 @@
 
 html {
   min-width: 320px;
-  background: var(--color-background);
+  background: var(--bg);
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-
   background:
-    radial-gradient(
-      circle at top left,
-      rgba(139, 92, 246, 0.13),
-      transparent 32rem
-    ),
-    var(--color-background);
-
-  color: var(--color-text);
-
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.13), transparent 32rem),
+    var(--bg);
+  color: var(--text);
   line-height: 1.5;
 }
 
@@ -146,7 +127,7 @@ video {
 
 .app-kicker {
   margin: 0 0 var(--space-2);
-  color: var(--color-primary-hover);
+  color: var(--primary-hover);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -155,7 +136,7 @@ video {
 
 .app-title {
   margin: 0;
-  color: var(--color-text);
+  color: var(--text);
   font-size: clamp(1.65rem, 3vw, 2.5rem);
   line-height: 1.12;
   letter-spacing: -0.03em;
@@ -164,31 +145,27 @@ video {
 .app-subtitle {
   max-width: 680px;
   margin: var(--space-3) 0 0;
-  color: var(--color-text-soft);
+  color: var(--text-soft);
   font-size: 0.98rem;
 }
 
 .app-status {
   flex: 0 0 auto;
   max-width: 280px;
-  margin: 0;
   padding: 0.65rem 0.9rem;
-
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 999px;
-
   background: rgba(18, 26, 45, 0.85);
-  color: var(--color-text-soft);
-
+  color: var(--text-soft);
   font-size: 0.8rem;
   text-align: center;
 }
 
-/* ---------- Main layout ---------- */
+/* ---------- Main single-page layout ---------- */
 
 .studio-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
   align-items: start;
   gap: var(--space-6);
 }
@@ -196,18 +173,14 @@ video {
 .editor-panel,
 .preview-panel {
   min-width: 0;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-extra-large);
-
-  background:
-    linear-gradient(
-      145deg,
-      rgba(18, 26, 45, 0.98),
-      rgba(13, 20, 36, 0.98)
-    );
-
-  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    145deg,
+    rgba(18, 26, 45, 0.98),
+    rgba(13, 20, 36, 0.98)
+  );
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.2);
 }
 
 .editor-panel {
@@ -219,8 +192,6 @@ video {
   top: 1rem;
   padding: clamp(1rem, 2vw, 1.5rem);
 }
-
-/* ---------- Panel headings ---------- */
 
 .panel-heading {
   display: flex;
@@ -238,11 +209,11 @@ video {
 
 .panel-description {
   margin: var(--space-2) 0 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.88rem;
 }
 
-/* ---------- Form structure ---------- */
+/* ---------- Form controls ---------- */
 
 .control-stack {
   display: grid;
@@ -252,7 +223,6 @@ video {
 .field {
   display: grid;
   gap: var(--space-2);
-  min-width: 0;
 }
 
 .field-row {
@@ -263,19 +233,16 @@ video {
 
 .field-label,
 .field > label {
-  color: var(--color-text);
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .field-help {
   margin: 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.78rem;
-  line-height: 1.55;
 }
-
-/* ---------- Inputs ---------- */
 
 .field input[type="file"],
 .field input[type="number"],
@@ -284,13 +251,10 @@ video {
 .field select,
 .field textarea {
   width: 100%;
-
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
-
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: rgba(5, 8, 22, 0.7);
-  color: var(--color-text);
-
+  color: var(--text);
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
@@ -308,8 +272,8 @@ video {
 
 .field textarea {
   min-height: 180px;
-  padding: 0.8rem;
   resize: vertical;
+  padding: 0.8rem;
   line-height: 1.65;
 }
 
@@ -320,26 +284,23 @@ video {
 .field input[type="file"]::file-selector-button {
   margin-right: 0.65rem;
   padding: 0.45rem 0.7rem;
-
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-small);
-
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text);
   cursor: pointer;
 }
 
 .field input:hover,
 .field select:hover,
 .field textarea:hover {
-  border-color: var(--color-border-strong);
+  border-color: var(--border-strong);
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: var(--color-primary-hover);
+  border-color: var(--primary-hover);
   background: rgba(5, 8, 22, 0.9);
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
   outline: none;
@@ -347,20 +308,40 @@ video {
 
 .textarea-meta {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
 .char-count {
-  flex: 0 0 auto;
-  color: var(--color-text-soft);
-  font-size: 0.78rem;
+  color: var(--text-soft);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* ---------- Action buttons ---------- */
+.range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.range-value {
+  min-width: 4rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Buttons ---------- */
 
 .action-row {
   display: flex;
@@ -374,16 +355,12 @@ video {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-
   padding: 0.7rem 1rem;
-
   border: 1px solid transparent;
-  border-radius: var(--radius-medium);
-
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 750;
   line-height: 1;
-
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -401,35 +378,41 @@ video {
 }
 
 .button-primary {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
+  background: var(--primary);
+  color: var(--primary-contrast);
   box-shadow: 0 8px 22px rgba(139, 92, 246, 0.22);
 }
 
 .button-primary:not(:disabled):hover {
-  background: var(--color-primary-hover);
+  background: var(--primary-hover);
 }
 
 .button-secondary {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
 }
 
 .button-secondary:not(:disabled):hover {
-  border-color: var(--color-primary-hover);
+  border-color: var(--primary-hover);
   background: #273555;
 }
 
 .button-ghost {
-  border-color: var(--color-border);
+  border-color: var(--border);
   background: transparent;
-  color: var(--color-text-soft);
+  color: var(--text-soft);
 }
 
 .button-ghost:not(:disabled):hover {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.button-danger {
+  border-color: rgba(251, 113, 133, 0.35);
+  background: rgba(251, 113, 133, 0.12);
+  color: #fecdd3;
 }
 
 /* ---------- Messages ---------- */
@@ -437,23 +420,23 @@ video {
 .message {
   min-height: 1.4rem;
   margin: var(--space-4) 0 0;
-  color: var(--color-text-soft);
+  color: var(--text-soft);
   font-size: 0.85rem;
 }
 
 .message.is-success {
-  color: var(--color-success);
+  color: var(--success);
 }
 
 .message.is-warning {
-  color: var(--color-warning);
+  color: var(--warning);
 }
 
 .message.is-error {
-  color: var(--color-danger);
+  color: var(--danger);
 }
 
-/* ---------- Preview header ---------- */
+/* ---------- Preview ---------- */
 
 .preview-heading {
   display: flex;
@@ -470,20 +453,13 @@ video {
 
 .preview-badge {
   padding: 0.35rem 0.6rem;
-
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 999px;
-
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
 }
-
-/* =========================================================
-   9:16 Preview Stage
-   The ENTIRE stage is the fullscreen target.
-   ========================================================= */
 
 .preview-stage {
   position: relative;
@@ -491,73 +467,32 @@ video {
   aspect-ratio: 9 / 16;
   margin: 0 auto;
   overflow: hidden;
-
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-large);
-
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   background:
-    linear-gradient(
-      145deg,
-      rgba(139, 92, 246, 0.08),
-      transparent 45%
-    ),
-    var(--color-preview-background);
-
+    linear-gradient(145deg, rgba(139, 92, 246, 0.08), transparent 45%),
+    var(--preview-bg);
   isolation: isolate;
-  contain: layout paint;
 }
 
 .preview-stage::after {
   position: absolute;
   inset: 0;
-  z-index: 10;
-
+  z-index: 3;
+  pointer-events: none;
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: inherit;
-
   content: "";
-  pointer-events: none;
 }
-
-/*
-  Browser fullscreen applies to this complete stage.
-  Photo/video, text, watermark and controls remain together.
-*/
-
-.preview-stage:fullscreen,
-.preview-stage:-webkit-full-screen {
-  width: 100vw;
-  max-width: none;
-  height: 100vh;
-  max-height: none;
-
-  aspect-ratio: auto;
-  margin: 0;
-
-  border: 0;
-  border-radius: 0;
-
-  background: #000;
-}
-
-.preview-stage:fullscreen::after,
-.preview-stage:-webkit-full-screen::after {
-  border: 0;
-  border-radius: 0;
-}
-
-/* ---------- Preview media ---------- */
 
 .preview-media {
   position: absolute;
   inset: 0;
   z-index: 0;
-
   width: 100%;
   height: 100%;
-
   object-fit: cover;
-  background: var(--color-preview-background);
+  background: var(--preview-bg);
 }
 
 .preview-media[hidden] {
@@ -568,13 +503,10 @@ video {
   position: absolute;
   inset: 0;
   z-index: 1;
-
   display: grid;
   place-items: center;
-
   padding: var(--space-6);
-
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -583,237 +515,91 @@ video {
   display: none;
 }
 
-/* =========================================================
-   One-line Text Overlay
-   - One complete line at a time
-   - Centered horizontally
-   - Slightly below center
-   - Semi-transparent black strip
-   ========================================================= */
-
 .text-overlay {
   position: absolute;
-  top: 58%;
-  right: 0;
-  left: 0;
+  right: 1rem;
+  bottom: 14%;
+  left: 1rem;
   z-index: 4;
-
   display: block;
   overflow: hidden;
-
-  padding: 0.7rem 0.75rem;
-
   color: #ffffff;
-  font-size: clamp(1rem, 3.8vw, 1.55rem);
+  font-size: clamp(1rem, 3.5vw, 1.55rem);
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.25;
   text-align: center;
-
-  /*
-    Photo-like translucent black strip.
-    It improves contrast without hiding the image completely.
-  */
-  background: rgba(0, 0, 0, 0.58);
-
-  /*
-    Subtle shadow only for readability.
-    No heavy black outline is used.
-  */
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.85),
-    0 0 2px rgba(0, 0, 0, 0.65);
-
-  /*
-    Only one complete line is visible at a time.
-  */
+  text-shadow: var(--overlay-shadow);
   white-space: nowrap;
   text-overflow: clip;
   overflow-wrap: normal;
   word-break: keep-all;
 }
 
-/* =========================================================
-   Multicolor Text
-   Entire visible line receives the multicolor effect.
-   The currently spoken word is not separately highlighted.
-   ========================================================= */
+.text-overlay[hidden] {
+  display: none;
+}
+
+/* ---------- Per-word multicolor chain ---------- */
 
 .multicolor-text {
-  /*
-    Fallback color for browsers that do not support
-    background clipping on text.
-  */
   color: #ffffff;
-
-  /*
-    Bright, saturated colors inspired by the reference photo.
-    The colors are intentionally not pastel or muddy.
-  */
-  background: linear-gradient(
-    90deg,
-    #ff2020 0%,
-    #ff2020 13%,
-    #ffd21f 25%,
-    #ffd21f 34%,
-    #18d94e 46%,
-    #18d94e 54%,
-    #19bfff 66%,
-    #168cff 73%,
-    #ff4fa3 86%,
-    #ff3030 100%
-  );
-
-  -webkit-background-clip: text;
-  background-clip: text;
-
-  -webkit-text-fill-color: transparent;
-
-  /*
-    Very thin edge only.
-    A thick black stroke would make the colors look dark.
-  */
-  -webkit-text-stroke: 0.15px rgba(0, 0, 0, 0.45);
-
-  /*
-    Controlled shadow keeps the colored letters separate
-    from the image and black strip without overpowering them.
-  */
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.8),
-    0 0 2px rgba(0, 0, 0, 0.55);
 }
 
-/* ---------- Watermark ---------- */
-
-.watermark {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  z-index: 5;
-
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.2;
-
-  white-space: nowrap;
-
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-
-  background: rgba(0, 0, 0, 0.28);
-
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-
-  pointer-events: none;
+.multicolor-text span {
+  display: inline;
 }
 
-.preview-stage:fullscreen .watermark,
-.preview-stage:-webkit-full-screen .watermark {
-  top: 1rem;
-  left: 1rem;
-  font-size: 0.78rem;
+.word-color-1 {
+  color: #ff6b6b;
 }
 
-/* =========================================================
-   Preview Controls
-   ========================================================= */
-
-/*
-  All floating controls stay inside the preview-stage,
-  so fullscreen keeps the controls attached to the same reel.
-*/
-
-.preview-control-button {
-  position: absolute;
-  z-index: 8;
-
-  display: inline-grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-
-  padding: 0;
-
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 50%;
-
-  background: rgba(5, 8, 22, 0.68);
-  color: #ffffff;
-
-  box-shadow: var(--shadow-control);
-
-  backdrop-filter: blur(10px);
-
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease,
-    opacity 160ms ease;
+.word-color-2 {
+  color: #ffd166;
 }
 
-.preview-control-button:hover {
-  border-color: rgba(255, 255, 255, 0.62);
-  background: rgba(32, 45, 73, 0.9);
-  transform: scale(1.05);
+.word-color-3 {
+  color: #06d6a0;
 }
 
-.preview-control-button:active {
-  transform: scale(0.97);
+.word-color-4 {
+  color: #4cc9f0;
 }
 
-.preview-control-button[hidden] {
-  display: none;
+.word-color-5 {
+  color: #c77dff;
 }
 
-.video-audio-button {
-  top: 0.75rem;
-  right: 0.75rem;
+.word-color-6 {
+  color: #ff8fab;
 }
 
-.fullscreen-button {
-  right: 0.75rem;
-  bottom: 0.75rem;
-}
+/* ---------- Preview controls ---------- */
 
-.preview-stage:fullscreen .video-audio-button,
-.preview-stage:-webkit-full-screen .video-audio-button {
-  top: 1rem;
-  right: 1rem;
+.preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
-
-.preview-stage:fullscreen .fullscreen-button,
-.preview-stage:-webkit-full-screen .fullscreen-button {
-  display: none;
-}
-
-/* ---------- Universal centered Play button ---------- */
 
 .preview-play-button {
   position: absolute;
   top: 50%;
   left: 50%;
   z-index: 8;
-
   display: inline-grid;
   width: 4rem;
   height: 4rem;
   place-items: center;
-
-  padding: 0;
-
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 50%;
-
   background: rgba(5, 8, 22, 0.72);
   color: #ffffff;
-
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-
   transform: translate(-50%, -50%);
-
   backdrop-filter: blur(10px);
-
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -841,91 +627,76 @@ video {
   line-height: 1;
 }
 
-/* ---------- Preview state intentionally hidden ---------- */
-
-/*
-  This element must not display progress text such as:
-  "पंक्ति 1/2 चल रही है"
-  "पंक्ति 2/2 चल रही है"
-*/
-
-.preview-state {
-  display: none !important;
+.preview-caption {
+  margin: var(--space-4) 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
 }
 
-/* ---------- Preview controls below stage ---------- */
+/* ---------- Watermark ---------- */
 
-.preview-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+.watermark {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.65rem;
+  z-index: 5;
+  max-width: calc(100% - 1.4rem);
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.55rem, 1.7vw, 0.72rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
 }
+
+/* ---------- Audio and export area ---------- */
 
 .audio-status {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.8rem;
-  text-align: center;
 }
 
 .audio-status::before {
   width: 0.5rem;
   height: 0.5rem;
-  flex: 0 0 0.5rem;
-
   border-radius: 50%;
-  background: var(--color-text-muted);
-
+  background: var(--text-muted);
   content: "";
 }
 
 .audio-status.is-ready {
-  color: var(--color-success);
+  color: var(--success);
 }
 
 .audio-status.is-ready::before {
-  background: var(--color-success);
+  background: var(--success);
 }
-
-.preview-caption {
-  margin: var(--space-4) 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-  text-align: center;
-}
-
-/* ---------- Export area ---------- */
 
 .export-area {
   display: grid;
   gap: var(--space-3);
-
   margin-top: var(--space-6);
   padding-top: var(--space-5);
-
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
 }
 
 .download-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   min-height: 2.85rem;
   padding: 0.7rem 1rem;
-
   border: 1px solid rgba(52, 211, 153, 0.35);
-  border-radius: var(--radius-medium);
-
+  border-radius: var(--radius-md);
   background: rgba(52, 211, 153, 0.12);
   color: #a7f3d0;
-
   font-size: 0.9rem;
   font-weight: 750;
   text-decoration: none;
@@ -942,28 +713,24 @@ video {
 }
 
 .is-muted {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .visually-hidden {
   position: absolute !important;
-
   width: 1px !important;
   height: 1px !important;
-
   padding: 0 !important;
   margin: -1px !important;
-
   overflow: hidden !important;
   clip: rect(0, 0, 0, 0) !important;
-
   white-space: nowrap !important;
   border: 0 !important;
 }
 
-/* ---------- Responsive behavior ---------- */
+/* ---------- Responsive layout ---------- */
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .studio-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -973,7 +740,7 @@ video {
   }
 
   .preview-stage {
-    width: min(100%, 430px);
+    width: min(100%, 420px);
   }
 }
 
@@ -995,7 +762,7 @@ video {
 
   .editor-panel,
   .preview-panel {
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-lg);
     padding: 1rem;
   }
 
@@ -1004,34 +771,14 @@ video {
   }
 
   .text-overlay {
-    top: 58%;
-    right: 0;
-    left: 0;
-
-    padding: 0.55rem 0.5rem;
-
-    font-size: clamp(0.9rem, 4.4vw, 1.2rem);
-    line-height: 1.3;
+    right: 0.65rem;
+    left: 0.65rem;
+    font-size: clamp(0.85rem, 4.6vw, 1.2rem);
   }
 
   .preview-play-button {
     width: 3.5rem;
     height: 3.5rem;
-  }
-
-  .preview-control-button {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-
-  .video-audio-button {
-    top: 0.55rem;
-    right: 0.55rem;
-  }
-
-  .fullscreen-button {
-    right: 0.55rem;
-    bottom: 0.55rem;
   }
 
   .action-row > .button {
@@ -1044,7 +791,6 @@ video {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
