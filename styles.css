@@ -532,7 +532,7 @@ input[type="range"] {
   white-space: nowrap;
   text-overflow: clip;
   overflow-wrap: normal;
-  word-break: keep-all;
+  word-break: normal;
 }
 
 .text-overlay[hidden] {
@@ -574,6 +574,56 @@ input[type="range"] {
 }
 
 /* ---------- Preview controls ---------- */
+
+.preview-control-button {
+  position: absolute;
+  top: 0.75rem;
+  z-index: 9;
+  display: inline-grid;
+  width: 2.65rem;
+  height: 2.65rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(5, 8, 22, 0.7);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.preview-control-button:hover {
+  border-color: rgba(255, 255, 255, 0.65);
+  background: rgba(139, 92, 246, 0.82);
+  transform: translateY(-1px);
+}
+
+.preview-control-button:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.preview-control-button[hidden] {
+  display: none;
+}
+
+.video-audio-button {
+  left: 0.75rem;
+}
+
+.fullscreen-button {
+  right: 0.75rem;
+  top: auto;
+  bottom: 0.75rem;
+}
+
+.preview-control-button span {
+  line-height: 1;
+  font-size: 1rem;
+}
+
 
 .preview-controls {
   display: flex;
@@ -638,8 +688,8 @@ input[type="range"] {
 
 .watermark {
   position: absolute;
+  top: 0.7rem;
   right: 0.7rem;
-  bottom: 0.65rem;
   z-index: 5;
   max-width: calc(100% - 1.4rem);
   overflow: hidden;
@@ -795,4 +845,36 @@ input[type="range"] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+
+/* ---------- Fullscreen preview ---------- */
+
+.preview-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.preview-stage:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.preview-stage:fullscreen .text-overlay,
+.preview-stage:-webkit-full-screen .text-overlay {
+  font-size: clamp(1.25rem, 4.2vw, 3rem);
+}
+
+.preview-stage:fullscreen .watermark,
+.preview-stage:-webkit-full-screen .watermark {
+  top: 1rem;
+  right: 1rem;
 }
