@@ -572,6 +572,24 @@ function getVoiceForLanguage(language) {
     return null;
   }
 
+  const prefix = language.split("-")[0].toLowerCase();
+  const voicesForLang = availableVoices.filter(
+    (voice) => voice.lang.toLowerCase().startsWith(prefix)
+  );
+  if (voicesForLang.length) {
+    let index = 0;
+    if (voiceSelect && voiceSelect.value) {
+      index = parseInt(voiceSelect.value, 10) - 1;
+      if (isNaN(index) || index < 0) {
+        index = 0;
+      }
+    }
+    if (voicesForLang[index]) {
+      return voicesForLang[index];
+    }
+    return voicesForLang[0];
+  }
+
   const exact = availableVoices.find(
     (voice) =>
       voice.lang.toLowerCase() === language.toLowerCase()
@@ -581,19 +599,7 @@ function getVoiceForLanguage(language) {
     return exact;
   }
 
-  const prefix = language
-    .split("-")[0]
-    .toLowerCase();
-
-  return (
-    availableVoices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(`${prefix}-`)
-    ) ||
-    availableVoices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(prefix)
-    ) ||
-    null
-  );
+  return null;
 }
 
 function stopSpeechSynthesis() {
@@ -1498,7 +1504,8 @@ async function exportReel() {
   try {
     if (
       selectedMediaType === "video" &&
-      typeof source.captureStream === "function"
+      typeof source.captureStream === "function" &&
+      !isVideoMuted
     ) {
       sourceStream = source.captureStream();
 
